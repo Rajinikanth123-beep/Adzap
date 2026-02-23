@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './NewApp.css';
 import logo from './logo.svg';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import HomePage from './pages/NewPages/HomePage';
 import RegisterPage from './pages/NewPages/RegisterPage';
 import AdminDashboard from './pages/NewPages/AdminDashboard';
@@ -582,8 +583,7 @@ export default function NewApp() {
       <footer className="adzap-footer">
         <p>&copy; 2026 ADZAP-DefendX Event Management System. All rights reserved.</p>
       </footer>
+      <SpeedInsights />
     </div>
   );
 }
-
-
