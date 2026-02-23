@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import './NewApp.css';
 import logo from './logo.svg';
@@ -16,7 +16,9 @@ import AdminLoginPage from './pages/NewPages/AdminLoginPage';
 import JudgeRegisterPage from './pages/NewPages/JudgeRegisterPage';
 import JudgeLoginPage from './pages/NewPages/JudgeLoginPage';
 
-const API_BASE = "https://adzap.onrender.com";
+const API_BASE = (process.env.REACT_APP_API_BASE_URL || 'https://adzap.onrender.com')
+  .trim()
+  .replace(/\/$/, '');
 const LOCAL_FALLBACK_ENABLED =
   process.env.REACT_APP_ALLOW_LOCAL_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
 
@@ -24,7 +26,13 @@ export default function NewApp() {
   const MAX_PARTICIPANT_REGISTRATIONS = 600;
   const MAX_ADMIN_ACCOUNTS = 6;
   const MAX_JUDGE_ACCOUNTS = 2;
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState(() => {
+    try {
+      return localStorage.getItem('adzap_current_page') || 'home';
+    } catch (_error) {
+      return 'home';
+    }
+  });
   const [user, setUser] = useState(null);
   const [teams, setTeams] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
@@ -32,6 +40,19 @@ export default function NewApp() {
   const [judgeAccounts, setJudgeAccounts] = useState([]);
   const [backendAvailable, setBackendAvailable] = useState(false);
   const [backendRequiredError, setBackendRequiredError] = useState('');
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+
+  const dedupeTeams = useCallback((teamList = []) => {
+    const byEmailOrId = new Map();
+    for (const team of teamList) {
+      const emailKey = String(team?.email || '').trim().toLowerCase();
+      const idKey = String(team?.id ?? '').trim();
+      const key = emailKey || idKey;
+      if (!key) continue;
+      byEmailOrId.set(key, team);
+    }
+    return Array.from(byEmailOrId.values());
+  }, []);
 
   const safeSetItem = (key, value, options = {}) => {
     const { fallbackValue } = options;
@@ -52,16 +73,32 @@ export default function NewApp() {
   };
 
   const callApi = async (method, url, data) => {
-    const response = await axios({
-      method,
-      url: `${API_BASE}${url}`,
-      data,
-      timeout: 12000,
-    });
-    return response.data;
+    const fullUrl = `${API_BASE}${url}`;
+
+    const run = () =>
+      axios({
+        method,
+        url: fullUrl,
+        data,
+        timeout: 30000,
+      });
+
+    try {
+      const response = await run();
+      return response.data;
+    } catch (error) {
+      // Render free tier can cold-start; retry once on transient/network errors.
+      const status = error?.response?.status;
+      const shouldRetry =
+        error?.code === 'ECONNABORTED' || !error?.response || [502, 503, 504].includes(status);
+      if (!shouldRetry) throw error;
+
+      const response = await run();
+      return response.data;
+    }
   };
 
-  const loadFromLocalStorage = () => {
+  const loadFromLocalStorage = useCallback(() => {
     try {
       const savedUser = localStorage.getItem('adzap_user');
       const savedTeams = localStorage.getItem('adzap_teams');
@@ -69,7 +106,7 @@ export default function NewApp() {
       const savedAdmins = localStorage.getItem('adzap_admins');
       const savedJudges = localStorage.getItem('adzap_judges');
       if (savedUser) setUser(JSON.parse(savedUser));
-      if (savedTeams) setTeams(JSON.parse(savedTeams));
+      if (savedTeams) setTeams(dedupeTeams(JSON.parse(savedTeams)));
       if (savedMessages) setContactMessages(JSON.parse(savedMessages));
       if (savedAdmins) setAdminAccounts(JSON.parse(savedAdmins));
       if (savedJudges) setJudgeAccounts(JSON.parse(savedJudges));
@@ -80,17 +117,18 @@ export default function NewApp() {
       localStorage.removeItem('adzap_admins');
       localStorage.removeItem('adzap_judges');
     }
-  };
+  }, [dedupeTeams]);
 
   useEffect(() => {
     let mounted = true;
 
     const bootstrap = async () => {
+      setIsBootstrapping(true);
       try {
         const data = await callApi('get', '/api/bootstrap');
         if (!mounted) return;
 
-        setTeams(Array.isArray(data?.teams) ? data.teams : []);
+        setTeams(dedupeTeams(Array.isArray(data?.teams) ? data.teams : []));
         setContactMessages(Array.isArray(data?.contactMessages) ? data.contactMessages : []);
         setAdminAccounts(Array.isArray(data?.adminAccounts) ? data.adminAccounts : []);
         setJudgeAccounts(Array.isArray(data?.judgeAccounts) ? data.judgeAccounts : []);
@@ -111,6 +149,10 @@ export default function NewApp() {
             'Backend is not reachable. Registration/login across devices needs a live backend API.'
           );
         }
+      } finally {
+        if (mounted) {
+          setIsBootstrapping(false);
+        }
       }
     };
 
@@ -118,7 +160,7 @@ export default function NewApp() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [dedupeTeams, loadFromLocalStorage]);
 
   // Save data to localStorage
   useEffect(() => {
@@ -175,6 +217,14 @@ export default function NewApp() {
     }
   }, [user, teams, contactMessages, adminAccounts, judgeAccounts]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem('adzap_current_page', currentPage);
+    } catch (_error) {
+      // Ignore storage issues and keep app functional.
+    }
+  }, [currentPage]);
+
   const getApiErrorMessage = (error, fallbackMessage) =>
     error?.response?.data?.message || fallbackMessage;
 
@@ -225,7 +275,7 @@ export default function NewApp() {
     if (backendAvailable) {
       try {
         const data = await callApi('post', '/api/teams/register', teamData);
-        setTeams(prev => [...prev, data.team]);
+        setTeams(prev => dedupeTeams([...prev, data.team]));
         setCurrentPage('participant-login');
         return { success: true };
       } catch (error) {
@@ -283,11 +333,10 @@ export default function NewApp() {
         const teamFromServer = data?.team;
         if (teamFromServer) {
           setTeams(prev => {
-            const exists = prev.some(t => t.id === teamFromServer.id);
-            if (exists) {
-              return prev.map(t => (t.id === teamFromServer.id ? { ...t, ...teamFromServer } : t));
-            }
-            return [...prev, teamFromServer];
+            const merged = prev.map(t =>
+              t.id === teamFromServer.id ? { ...t, ...teamFromServer } : t
+            );
+            return dedupeTeams([...merged, teamFromServer]);
           });
         }
         const team = teamFromServer || teams.find(t => t.id === data?.user?.teamId);
@@ -493,9 +542,16 @@ export default function NewApp() {
   const handleLogout = () => {
     setUser(null);
     setCurrentPage('home');
+    try {
+      localStorage.removeItem('adzap_current_page');
+    } catch (_error) {
+      // Ignore storage issues.
+    }
   };
 
   useEffect(() => {
+    if (isBootstrapping) return;
+
     if (currentPage === 'participant-dashboard' && user?.role !== 'participant') {
       setCurrentPage('participant-login');
     }
@@ -505,7 +561,7 @@ export default function NewApp() {
     if (currentPage === 'judge-dashboard' && user?.role !== 'judge') {
       setCurrentPage('judge-login');
     }
-  }, [currentPage, user]);
+  }, [currentPage, user, isBootstrapping]);
 
   const openAdminSection = () => {
     if (user?.role === 'admin') {
@@ -861,6 +917,17 @@ export default function NewApp() {
 
   return (
     <div className="adzap-container">
+      {isBootstrapping ? (
+        <main className="adzap-main" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
+          <div className="card" style={{ maxWidth: 560, width: '100%', textAlign: 'center' }}>
+            <h2 style={{ marginBottom: '0.7rem', color: '#22d3ee' }}>Server waking up, please wait...</h2>
+            <p style={{ color: '#a0aab9', lineHeight: 1.6 }}>
+              Initial connection can take a few seconds on first load.
+            </p>
+          </div>
+        </main>
+      ) : (
+        <>
       {/* Header */}
       <header className="adzap-header">
         <div className="header-content">
@@ -918,6 +985,8 @@ export default function NewApp() {
       <footer className="adzap-footer">
         <p>&copy; 2026 ADZAP-DefendX Event Management System. All rights reserved.</p>
       </footer>
+        </>
+      )}
     </div>
   );
 }
