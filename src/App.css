@@ -1,38 +1,524 @@
-.App {
-  text-align: center;
+/* ================= GLOBAL STYLES ================= */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.App-logo {
-  height: 40vmin;
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #000000 0%, #0a0e27 50%, #000000 100%);
+  background-attachment: fixed;
+  color: #fff;
+  min-height: 100vh;
+}
+
+/* ================= NAVIGATION ================= */
+nav {
+  background: rgba(11, 15, 35, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(34, 211, 238, 0.2);
+  box-shadow: 0 8px 32px rgba(34, 211, 238, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+nav h1 {
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
+}
+
+nav a {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-weight: 600;
+  position: relative;
+  overflow: hidden;
+}
+
+nav a::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.3), transparent);
+  transition: left 0.5s ease;
+}
+
+nav a:hover {
+  background-color: rgba(34, 211, 238, 0.15);
+  color: #22d3ee;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 16px rgba(34, 211, 238, 0.2);
+}
+
+nav a:hover::before {
+  left: 100%;
+}
+
+/* ================= HERO SECTION ================= */
+.hero {
+  background: linear-gradient(135deg, rgba(10, 14, 39, 0.9) 0%, rgba(34, 211, 238, 0.05) 50%, rgba(10, 14, 39, 0.9) 100%);
+  padding: 120px 20px;
+  text-align: center;
+  border-bottom: 2px solid rgba(34, 211, 238, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.1) 0%, transparent 70%);
   pointer-events: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+.hero h1 {
+  font-size: 4rem;
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 50%, #0891b2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+  font-weight: 800;
+  text-shadow: 0 0 40px rgba(34, 211, 238, 0.4);
+  letter-spacing: -1px;
+  animation: glowPulse 3s ease-in-out infinite;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+.hero p {
+  font-size: 1.3rem;
+  color: #b0b9c3;
+  margin-bottom: 40px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.8;
+  font-weight: 300;
+  animation: fadeIn 1s ease-in-out 0.3s both;
+}
+
+/* ================= BUTTONS ================= */
+.btn {
+  display: inline-block;
+  padding: 14px 40px;
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
   color: white;
+  text-decoration: none;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 8px 24px rgba(6, 182, 212, 0.4);
+  position: relative;
+  overflow: hidden;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-.App-link {
-  color: #61dafb;
+.btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s ease;
 }
 
-@keyframes App-logo-spin {
+.btn:hover {
+  background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+  transform: translateY(-4px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(6, 182, 212, 0.6),
+              0 0 20px rgba(34, 211, 238, 0.4);
+  border-color: rgba(34, 211, 238, 0.5);
+}
+
+.btn:hover::before {
+  left: 100%;
+}
+
+.btn:active {
+  transform: translateY(-2px) scale(0.98);
+}
+
+/* ================= CARDS ================= */
+.card {
+  background: linear-gradient(135deg, rgba(10, 15, 35, 0.7) 0%, rgba(34, 211, 238, 0.05) 100%);
+  border: 2px solid rgba(34, 211, 238, 0.2);
+  border-radius: 12px;
+  padding: 32px;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(34, 211, 238, 0.2) 0%, transparent 70%);
+  transition: all 0.6s ease;
+  pointer-events: none;
+}
+
+.card:hover {
+  border-color: rgba(34, 211, 238, 0.6);
+  background: linear-gradient(135deg, rgba(10, 15, 35, 0.9) 0%, rgba(34, 211, 238, 0.1) 100%);
+  box-shadow: 0 16px 48px rgba(34, 211, 238, 0.25),
+              inset 0 0 20px rgba(34, 211, 238, 0.1);
+  transform: translateY(-8px) scale(1.02);
+}
+
+.card:hover::before {
+  top: -25%;
+  right: -25%;
+}
+
+.card h3 {
+  font-size: 1.6rem;
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+  font-weight: 700;
+  position: relative;
+  z-index: 1;
+}
+
+.card p {
+  color: #a0aab9;
+  line-height: 1.8;
+  position: relative;
+  z-index: 1;
+  font-weight: 400;
+}
+
+/* ================= FORMS ================= */
+form {
+  background: linear-gradient(135deg, rgba(10, 15, 35, 0.8) 0%, rgba(20, 30, 60, 0.6) 100%);
+  border: 2px solid rgba(34, 211, 238, 0.3);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4),
+              inset 0 0 20px rgba(34, 211, 238, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+form label {
+  display: block;
+  background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+form input,
+form textarea,
+form select {
+  width: 100%;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(34, 211, 238, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(5px);
+}
+
+form input::placeholder,
+form textarea::placeholder {
+  color: #667080;
+}
+
+form input:focus,
+form textarea:focus,
+form select:focus {
+  outline: none;
+  border-color: #22d3ee;
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3),
+              inset 0 0 10px rgba(34, 211, 238, 0.1);
+  transform: scale(1.02);
+}
+
+form textarea {
+  resize: vertical;
+  min-height: 160px;
+}
+
+form button {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  color: white;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 8px 24px rgba(6, 182, 212, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+form button::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: left 0.6s ease;
+}
+
+form button:hover {
+  background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+  box-shadow: 0 12px 36px rgba(6, 182, 212, 0.6),
+              0 0 20px rgba(34, 211, 238, 0.4);
+  transform: translateY(-3px) scale(1.02);
+  border-color: rgba(34, 211, 238, 0.5);
+}
+
+form button:hover::before {
+  left: 100%;
+}
+
+/* ================= ALERTS ================= */
+.alert {
+  padding: 18px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  font-weight: 600;
+  border-left: 4px solid;
+  backdrop-filter: blur(10px);
+  animation: slideInUp 0.4s ease-out;
+}
+
+.alert-success {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(34, 197, 94, 0.05) 100%);
+  border: 2px solid rgba(34, 197, 94, 0.4);
+  border-left-color: #22d356;
+  color: #86efac;
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
+}
+
+.alert-error {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%);
+  border: 2px solid rgba(239, 68, 68, 0.4);
+  border-left-color: #ef4444;
+  color: #fca5a5;
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15);
+}
+
+/* ================= TABLE ================= */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: linear-gradient(135deg, rgba(10, 15, 35, 0.6) 0%, rgba(20, 30, 60, 0.4) 100%);
+  border: 2px solid rgba(34, 211, 238, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(34, 211, 238, 0.1);
+}
+
+th {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.2) 0%, rgba(6, 182, 212, 0.1) 100%);
+  color: #22d3ee;
+  padding: 18px 16px;
+  text-align: left;
+  font-weight: 700;
+  border-bottom: 2px solid rgba(34, 211, 238, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+}
+
+td {
+  padding: 16px 16px;
+  border-bottom: 1px solid rgba(34, 211, 238, 0.1);
+  color: #a0aab9;
+}
+
+tr {
+  transition: all 0.3s ease;
+}
+
+tr:hover {
+  background-color: rgba(34, 211, 238, 0.05);
+  box-shadow: inset 0 0 20px rgba(34, 211, 238, 0.1);
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* ================= FOOTER ================= */
+footer {
+  background: linear-gradient(135deg, rgba(10, 15, 35, 0.9) 0%, rgba(20, 30, 60, 0.7) 100%);
+  border-top: 2px solid rgba(34, 211, 238, 0.2);
+  padding: 30px 24px;
+  text-align: center;
+  color: #8a92a1;
+  margin-top: auto;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -8px 32px rgba(34, 211, 238, 0.1);
+  font-weight: 500;
+}
+
+/* ================= ANIMATIONS ================= */
+@keyframes fadeIn {
   from {
-    transform: rotate(0deg);
+    opacity: 0;
+    transform: translateY(30px);
   }
   to {
-    transform: rotate(360deg);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(34, 211, 238, 0.3),
+                 0 0 40px rgba(34, 211, 238, 0.2);
+  }
+  50% {
+    text-shadow: 0 0 30px rgba(34, 211, 238, 0.5),
+                 0 0 60px rgba(34, 211, 238, 0.3);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* ================= RESPONSIVE DESIGN ================= */
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .hero p {
+    font-size: 1rem;
+  }
+
+  form {
+    padding: 20px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  th, td {
+    padding: 12px 8px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .hero {
+    padding: 40px 16px;
+  }
+
+  nav {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  form {
+    padding: 16px;
   }
 }
