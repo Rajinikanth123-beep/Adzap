@@ -588,8 +588,8 @@ async function start() {
     console.log("Storage mode: file");
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`ADZAP backend is running on http://0.0.0.0:${PORT}`);
+  app.listen(PORT, () => {
+    console.log("Server running on port " + PORT);
   });
 }
 
@@ -597,3 +597,4 @@ start().catch((error) => {
   console.error("Failed to initialize backend:", error);
   process.exit(1);
 });
+
