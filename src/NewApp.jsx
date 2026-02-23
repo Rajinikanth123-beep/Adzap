@@ -21,18 +21,40 @@ const API_BASE = (process.env.REACT_APP_API_BASE_URL || 'https://adzap.onrender.
   .replace(/\/$/, '');
 const LOCAL_FALLBACK_ENABLED =
   process.env.REACT_APP_ALLOW_LOCAL_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
+const VALID_PAGES = new Set([
+  'home',
+  'participant-register',
+  'participant-login',
+  'participant-dashboard',
+  'admin-register',
+  'admin-login',
+  'admin-dashboard',
+  'judge-register',
+  'judge-login',
+  'judge-dashboard',
+  'presentations',
+  'final',
+  'contact',
+]);
+
+const normalizePage = (page) => (VALID_PAGES.has(page) ? page : 'home');
+
+const getInitialPage = () => {
+  try {
+    const hashPage = window.location.hash.replace('#', '').trim();
+    if (hashPage) return normalizePage(hashPage);
+    const storedPage = localStorage.getItem('adzap_current_page');
+    return normalizePage(storedPage || 'home');
+  } catch (_error) {
+    return 'home';
+  }
+};
 
 export default function NewApp() {
   const MAX_PARTICIPANT_REGISTRATIONS = 600;
   const MAX_ADMIN_ACCOUNTS = 6;
   const MAX_JUDGE_ACCOUNTS = 2;
-  const [currentPage, setCurrentPage] = useState(() => {
-    try {
-      return localStorage.getItem('adzap_current_page') || 'home';
-    } catch (_error) {
-      return 'home';
-    }
-  });
+  const [currentPage, setCurrentPage] = useState(getInitialPage);
   const [user, setUser] = useState(null);
   const [teams, setTeams] = useState([]);
   const [contactMessages, setContactMessages] = useState([]);
@@ -41,6 +63,7 @@ export default function NewApp() {
   const [backendAvailable, setBackendAvailable] = useState(false);
   const [backendRequiredError, setBackendRequiredError] = useState('');
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [hasHydratedSession, setHasHydratedSession] = useState(false);
 
   const dedupeTeams = useCallback((teamList = []) => {
     const byEmailOrId = new Map();
@@ -152,6 +175,7 @@ export default function NewApp() {
       } finally {
         if (mounted) {
           setIsBootstrapping(false);
+          setHasHydratedSession(true);
         }
       }
     };
@@ -164,6 +188,8 @@ export default function NewApp() {
 
   // Save data to localStorage
   useEffect(() => {
+    if (!hasHydratedSession) return;
+
     if (user) {
       const persisted = safeSetItem('adzap_user', user);
       if (!persisted) localStorage.removeItem('adzap_user');
@@ -215,15 +241,29 @@ export default function NewApp() {
     } else {
       localStorage.removeItem('adzap_judges');
     }
-  }, [user, teams, contactMessages, adminAccounts, judgeAccounts]);
+  }, [user, teams, contactMessages, adminAccounts, judgeAccounts, hasHydratedSession]);
 
   useEffect(() => {
     try {
       localStorage.setItem('adzap_current_page', currentPage);
+      const hashValue = `#${currentPage}`;
+      if (window.location.hash !== hashValue) {
+        window.history.replaceState(null, '', hashValue);
+      }
     } catch (_error) {
       // Ignore storage issues and keep app functional.
     }
   }, [currentPage]);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const nextPage = normalizePage(window.location.hash.replace('#', '').trim() || 'home');
+      setCurrentPage(prev => (prev === nextPage ? prev : nextPage));
+    };
+
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const getApiErrorMessage = (error, fallbackMessage) =>
     error?.response?.data?.message || fallbackMessage;

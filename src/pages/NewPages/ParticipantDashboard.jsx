@@ -21,6 +21,21 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
   const round1Selected = userTeam.round1?.selected || false;
   const round2Selection = userTeam.round2?.selected || false;
 
+  const sendWhatsApp = (phone) => {
+    const cleanPhone = String(phone || '').replace(/\D/g, '');
+    if (!cleanPhone) return;
+
+    const formattedPhone = cleanPhone.startsWith('91')
+      ? cleanPhone
+      : `91${cleanPhone}`;
+
+    const website = 'https://adzap-lilac.vercel.app/';
+    const message = `Hello 👋\nVisit ADZAP website here:\n${website}`;
+    const url = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
+
+    window.open(url, '_blank');
+  };
+
   const handlePosterUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -123,6 +138,13 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
                     ✉️ {member.email}
                   </a>
                 </p>
+                <button
+                  type="button"
+                  onClick={() => sendWhatsApp(member.phone)}
+                  className="whatsapp-btn"
+                >
+                  Send WhatsApp
+                </button>
               </div>
             </div>
           ))}
@@ -433,6 +455,23 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
           text-decoration: underline;
         }
 
+        .whatsapp-btn {
+          border: 1px solid rgba(34, 197, 94, 0.4);
+          background: linear-gradient(135deg, rgba(22, 163, 74, 0.4) 0%, rgba(34, 197, 94, 0.25) 100%);
+          color: #dcfce7;
+          border-radius: 7px;
+          padding: 0.45rem 0.6rem;
+          font-size: 0.82rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .whatsapp-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 8px 16px rgba(34, 197, 94, 0.25);
+        }
+
         .upload-container {
           margin-bottom: 1rem;
         }
@@ -600,3 +639,5 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
     </div>
   );
 }
+
+
