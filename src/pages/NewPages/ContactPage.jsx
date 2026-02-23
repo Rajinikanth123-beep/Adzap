@@ -19,14 +19,18 @@ export default function ContactPage({ onNavigate, onSubmitMessage }) {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.message) {
       setSubmitStatus('Please fill in all required fields');
       return;
     }
     if (onSubmitMessage) {
-      onSubmitMessage(formData);
+      const result = await Promise.resolve(onSubmitMessage(formData));
+      if (result?.success === false) {
+        setSubmitStatus(result.message || 'Failed to send message');
+        return;
+      }
     }
     setSubmitStatus('Message sent successfully! We will contact you soon.');
     setFormData({ name: '', email: '', phone: '', subject: '', message: '' });

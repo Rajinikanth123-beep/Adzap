@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import './NewApp.css';
 import logo from './logo.svg';
 import HomePage from './pages/NewPages/HomePage';
@@ -15,6 +16,10 @@ import AdminLoginPage from './pages/NewPages/AdminLoginPage';
 import JudgeRegisterPage from './pages/NewPages/JudgeRegisterPage';
 import JudgeLoginPage from './pages/NewPages/JudgeLoginPage';
 
+const API_BASE = "https://adzap.onrender.com";
+const LOCAL_FALLBACK_ENABLED =
+  process.env.REACT_APP_ALLOW_LOCAL_FALLBACK === 'true' || process.env.NODE_ENV !== 'production';
+
 export default function NewApp() {
   const MAX_PARTICIPANT_REGISTRATIONS = 600;
   const MAX_ADMIN_ACCOUNTS = 6;
@@ -25,49 +30,219 @@ export default function NewApp() {
   const [contactMessages, setContactMessages] = useState([]);
   const [adminAccounts, setAdminAccounts] = useState([]);
   const [judgeAccounts, setJudgeAccounts] = useState([]);
+  const [backendAvailable, setBackendAvailable] = useState(false);
+  const [backendRequiredError, setBackendRequiredError] = useState('');
 
-  // Load data from localStorage
+  const safeSetItem = (key, value, options = {}) => {
+    const { fallbackValue } = options;
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      if (fallbackValue !== undefined) {
+        try {
+          localStorage.setItem(key, JSON.stringify(fallbackValue));
+          return true;
+        } catch (_fallbackError) {
+          return false;
+        }
+      }
+      return false;
+    }
+  };
+
+  const callApi = async (method, url, data) => {
+    const response = await axios({
+      method,
+      url: `${API_BASE}${url}`,
+      data,
+      timeout: 12000,
+    });
+    return response.data;
+  };
+
+  const loadFromLocalStorage = () => {
+    try {
+      const savedUser = localStorage.getItem('adzap_user');
+      const savedTeams = localStorage.getItem('adzap_teams');
+      const savedMessages = localStorage.getItem('adzap_contact_messages');
+      const savedAdmins = localStorage.getItem('adzap_admins');
+      const savedJudges = localStorage.getItem('adzap_judges');
+      if (savedUser) setUser(JSON.parse(savedUser));
+      if (savedTeams) setTeams(JSON.parse(savedTeams));
+      if (savedMessages) setContactMessages(JSON.parse(savedMessages));
+      if (savedAdmins) setAdminAccounts(JSON.parse(savedAdmins));
+      if (savedJudges) setJudgeAccounts(JSON.parse(savedJudges));
+    } catch (error) {
+      localStorage.removeItem('adzap_user');
+      localStorage.removeItem('adzap_teams');
+      localStorage.removeItem('adzap_contact_messages');
+      localStorage.removeItem('adzap_admins');
+      localStorage.removeItem('adzap_judges');
+    }
+  };
+
   useEffect(() => {
-    const savedUser = localStorage.getItem('adzap_user');
-    const savedTeams = localStorage.getItem('adzap_teams');
-    const savedMessages = localStorage.getItem('adzap_contact_messages');
-    const savedAdmins = localStorage.getItem('adzap_admins');
-    const savedJudges = localStorage.getItem('adzap_judges');
-    if (savedUser) setUser(JSON.parse(savedUser));
-    if (savedTeams) setTeams(JSON.parse(savedTeams));
-    if (savedMessages) setContactMessages(JSON.parse(savedMessages));
-    if (savedAdmins) setAdminAccounts(JSON.parse(savedAdmins));
-    if (savedJudges) setJudgeAccounts(JSON.parse(savedJudges));
+    let mounted = true;
+
+    const bootstrap = async () => {
+      try {
+        const data = await callApi('get', '/api/bootstrap');
+        if (!mounted) return;
+
+        setTeams(Array.isArray(data?.teams) ? data.teams : []);
+        setContactMessages(Array.isArray(data?.contactMessages) ? data.contactMessages : []);
+        setAdminAccounts(Array.isArray(data?.adminAccounts) ? data.adminAccounts : []);
+        setJudgeAccounts(Array.isArray(data?.judgeAccounts) ? data.judgeAccounts : []);
+        setBackendAvailable(true);
+        setBackendRequiredError('');
+
+        const savedUser = localStorage.getItem('adzap_user');
+        if (savedUser) {
+          setUser(JSON.parse(savedUser));
+        }
+      } catch (_error) {
+        if (!mounted) return;
+        setBackendAvailable(false);
+        if (LOCAL_FALLBACK_ENABLED) {
+          loadFromLocalStorage();
+        } else {
+          setBackendRequiredError(
+            'Backend is not reachable. Registration/login across devices needs a live backend API.'
+          );
+        }
+      }
+    };
+
+    bootstrap();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   // Save data to localStorage
   useEffect(() => {
-    if (user) localStorage.setItem('adzap_user', JSON.stringify(user));
-    else localStorage.removeItem('adzap_user');
+    if (user) {
+      const persisted = safeSetItem('adzap_user', user);
+      if (!persisted) localStorage.removeItem('adzap_user');
+    } else {
+      localStorage.removeItem('adzap_user');
+    }
 
-    if (teams.length > 0) localStorage.setItem('adzap_teams', JSON.stringify(teams));
-    else localStorage.removeItem('adzap_teams');
+    if (teams.length > 0) {
+      const teamsWithoutPosterData = teams.map(team => {
+        if (!team.poster || typeof team.poster !== 'string') return team;
+        if (!team.poster.startsWith('data:')) return team;
+        const { poster, ...rest } = team;
+        return rest;
+      });
 
-    if (contactMessages.length > 0) localStorage.setItem('adzap_contact_messages', JSON.stringify(contactMessages));
-    else localStorage.removeItem('adzap_contact_messages');
+      const persisted = safeSetItem('adzap_teams', teams, {
+        fallbackValue: teamsWithoutPosterData,
+      });
+      if (!persisted) {
+        localStorage.removeItem('adzap_teams');
+      }
+    } else {
+      localStorage.removeItem('adzap_teams');
+    }
 
-    if (adminAccounts.length > 0) localStorage.setItem('adzap_admins', JSON.stringify(adminAccounts));
-    else localStorage.removeItem('adzap_admins');
+    if (contactMessages.length > 0) {
+      const persisted = safeSetItem('adzap_contact_messages', contactMessages);
+      if (!persisted) {
+        localStorage.removeItem('adzap_contact_messages');
+      }
+    } else {
+      localStorage.removeItem('adzap_contact_messages');
+    }
 
-    if (judgeAccounts.length > 0) localStorage.setItem('adzap_judges', JSON.stringify(judgeAccounts));
-    else localStorage.removeItem('adzap_judges');
+    if (adminAccounts.length > 0) {
+      const persisted = safeSetItem('adzap_admins', adminAccounts);
+      if (!persisted) {
+        localStorage.removeItem('adzap_admins');
+      }
+    } else {
+      localStorage.removeItem('adzap_admins');
+    }
+
+    if (judgeAccounts.length > 0) {
+      const persisted = safeSetItem('adzap_judges', judgeAccounts);
+      if (!persisted) {
+        localStorage.removeItem('adzap_judges');
+      }
+    } else {
+      localStorage.removeItem('adzap_judges');
+    }
   }, [user, teams, contactMessages, adminAccounts, judgeAccounts]);
 
-  const submitContactMessage = (messageData) => {
+  const getApiErrorMessage = (error, fallbackMessage) =>
+    error?.response?.data?.message || fallbackMessage;
+
+  const persistTeams = async (nextTeams) => {
+    setTeams(nextTeams);
+    if (!backendAvailable) return true;
+
+    try {
+      await callApi('put', '/api/teams', { teams: nextTeams });
+      return true;
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'Failed to sync teams with backend.'));
+      return false;
+    }
+  };
+
+  const submitContactMessage = async (messageData) => {
+    if (backendAvailable) {
+      try {
+        const created = await callApi('post', '/api/contact-messages', messageData);
+        setContactMessages(prev => [created, ...prev]);
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          message: getApiErrorMessage(error, 'Failed to submit message'),
+        };
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      return {
+        success: false,
+        message: 'Backend is unavailable. Please try again once server is online.',
+      };
+    }
+
     const newMessage = {
       id: Date.now(),
       ...messageData,
       createdAt: new Date().toISOString(),
     };
     setContactMessages(prev => [newMessage, ...prev]);
+    return { success: true };
   };
 
-  const handleRegister = (teamData) => {
+  const handleRegister = async (teamData) => {
+    if (backendAvailable) {
+      try {
+        const data = await callApi('post', '/api/teams/register', teamData);
+        setTeams(prev => [...prev, data.team]);
+        setCurrentPage('participant-login');
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          message: getApiErrorMessage(error, 'Registration failed'),
+        };
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      return {
+        success: false,
+        message: 'Backend is unavailable. Registration is disabled until server is online.',
+      };
+    }
+
     if (teams.length >= MAX_PARTICIPANT_REGISTRATIONS) {
       return {
         success: false,
@@ -89,7 +264,10 @@ export default function NewApp() {
     const newTeam = {
       id: Date.now(),
       ...teamData,
+      teamName: teamData.teamName?.trim(),
+      teamNumber: teamData.teamNumber?.trim(),
       email: teamData.email?.trim(),
+      password: teamData.password?.trim(),
       round1: { avgScore: 0, selected: false },
       round2: { avgScore: 0, selected: false },
     };
@@ -98,7 +276,34 @@ export default function NewApp() {
     return { success: true };
   };
 
-  const handleParticipantLogin = (email, password) => {
+  const handleParticipantLogin = async (email, password) => {
+    if (backendAvailable) {
+      try {
+        const data = await callApi('post', '/api/auth/participant/login', { email, password });
+        const teamFromServer = data?.team;
+        if (teamFromServer) {
+          setTeams(prev => {
+            const exists = prev.some(t => t.id === teamFromServer.id);
+            if (exists) {
+              return prev.map(t => (t.id === teamFromServer.id ? { ...t, ...teamFromServer } : t));
+            }
+            return [...prev, teamFromServer];
+          });
+        }
+        const team = teamFromServer || teams.find(t => t.id === data?.user?.teamId);
+        setUser(team ? { ...team, role: 'participant', teamId: team.id } : data.user);
+        setCurrentPage('participant-dashboard');
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      alert('Backend is unavailable. Login is disabled until server is online.');
+      return false;
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
     const team = teams.find(
@@ -112,7 +317,28 @@ export default function NewApp() {
     return false;
   };
 
-  const handleAdminRegister = (adminData) => {
+  const handleAdminRegister = async (adminData) => {
+    if (backendAvailable) {
+      try {
+        const data = await callApi('post', '/api/auth/admin/register', adminData);
+        setAdminAccounts(prev => [...prev, data.admin]);
+        setCurrentPage('admin-login');
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          message: getApiErrorMessage(error, 'Admin registration failed'),
+        };
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      return {
+        success: false,
+        message: 'Backend is unavailable. Admin registration is disabled until server is online.',
+      };
+    }
+
     if (adminAccounts.length >= MAX_ADMIN_ACCOUNTS) {
       return {
         success: false,
@@ -136,7 +362,28 @@ export default function NewApp() {
     return { success: true };
   };
 
-  const handleJudgeRegister = (judgeData) => {
+  const handleJudgeRegister = async (judgeData) => {
+    if (backendAvailable) {
+      try {
+        const data = await callApi('post', '/api/auth/judge/register', judgeData);
+        setJudgeAccounts(prev => [...prev, data.judge]);
+        setCurrentPage('judge-login');
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          message: getApiErrorMessage(error, 'Judge registration failed'),
+        };
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      return {
+        success: false,
+        message: 'Backend is unavailable. Judge registration is disabled until server is online.',
+      };
+    }
+
     if (judgeAccounts.length >= MAX_JUDGE_ACCOUNTS) {
       return {
         success: false,
@@ -160,7 +407,23 @@ export default function NewApp() {
     return { success: true };
   };
 
-  const handleAdminLogin = (email, password) => {
+  const handleAdminLogin = async (email, password) => {
+    if (backendAvailable) {
+      try {
+        const data = await callApi('post', '/api/auth/admin/login', { email, password });
+        setUser(data.user);
+        setCurrentPage('admin-dashboard');
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      alert('Backend is unavailable. Login is disabled until server is online.');
+      return false;
+    }
+
     const savedAdmin = adminAccounts.find(
       account =>
         account.email.toLowerCase() === email.toLowerCase() &&
@@ -185,7 +448,23 @@ export default function NewApp() {
     return false;
   };
 
-  const handleJudgeLogin = (email, password) => {
+  const handleJudgeLogin = async (email, password) => {
+    if (backendAvailable) {
+      try {
+        const data = await callApi('post', '/api/auth/judge/login', { email, password });
+        setUser(data.user);
+        setCurrentPage('judge-dashboard');
+        return true;
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      alert('Backend is unavailable. Login is disabled until server is online.');
+      return false;
+    }
+
     const savedJudge = judgeAccounts.find(
       account =>
         account.email.toLowerCase() === email.toLowerCase() &&
@@ -216,6 +495,18 @@ export default function NewApp() {
     setCurrentPage('home');
   };
 
+  useEffect(() => {
+    if (currentPage === 'participant-dashboard' && user?.role !== 'participant') {
+      setCurrentPage('participant-login');
+    }
+    if (currentPage === 'admin-dashboard' && user?.role !== 'admin') {
+      setCurrentPage('admin-login');
+    }
+    if (currentPage === 'judge-dashboard' && user?.role !== 'judge') {
+      setCurrentPage('judge-login');
+    }
+  }, [currentPage, user]);
+
   const openAdminSection = () => {
     if (user?.role === 'admin') {
       setCurrentPage('admin-dashboard');
@@ -240,7 +531,7 @@ export default function NewApp() {
     setCurrentPage('judge-login');
   };
 
-  const updateTeamScores = (teamId, judgeId, score) => {
+  const updateTeamScores = async (teamId, judgeId, score) => {
     const updated = teams.map(team => {
       if (team.id === teamId) {
         const existingJudgeScores = team.scores?.[judgeId] || {};
@@ -258,20 +549,20 @@ export default function NewApp() {
       }
       return team;
     });
-    setTeams(updated);
+    await persistTeams(updated);
   };
 
-  const selectRound1 = (teamIds) => {
+  const selectRound1 = async (teamIds) => {
     const updated = teams.map(team => ({
       ...team,
       round1: { ...team.round1, selected: teamIds.includes(team.id) },
       // Reset round2 selection when round1 qualifiers are re-finalized
       round2: { ...team.round2, selected: false },
     }));
-    setTeams(updated);
+    await persistTeams(updated);
   };
 
-  const selectRound2 = (teamIds) => {
+  const selectRound2 = async (teamIds) => {
     const updated = teams.map(team => ({
       ...team,
       // Only round1-qualified teams can be selected in round2
@@ -280,68 +571,67 @@ export default function NewApp() {
         selected: team.round1?.selected ? teamIds.includes(team.id) : false,
       },
     }));
-    setTeams(updated);
+    await persistTeams(updated);
   };
 
-  const uploadTeamPoster = (teamId, posterData) => {
+  const uploadTeamPoster = async (teamId, posterData) => {
     const updated = teams.map(team => {
       if (team.id === teamId) {
         return { ...team, poster: posterData };
       }
       return team;
     });
-    setTeams(updated);
+    await persistTeams(updated);
   };
 
-  const updateTeamProductName = (teamId, productName) => {
+  const updateTeamProductName = async (teamId, productName) => {
     const updated = teams.map(team => {
       if (team.id === teamId) {
         return { ...team, productName };
       }
       return team;
     });
-    setTeams(updated);
+    await persistTeams(updated);
   };
 
-  const clearRoundSelections = (round) => {
+  const clearRoundSelections = async (round) => {
     const roundKey = `round${round}`;
-    setTeams(prev =>
-      prev.map(team => ({
-        ...team,
-        [roundKey]: {
-          ...(team[roundKey] || {}),
-          selected: false,
-        },
-      }))
-    );
+    const updated = teams.map(team => ({
+      ...team,
+      [roundKey]: {
+        ...(team[roundKey] || {}),
+        selected: false,
+      },
+    }));
+    await persistTeams(updated);
   };
 
-  const deleteTeams = (teamIds) => {
+  const deleteTeams = async (teamIds) => {
     if (!teamIds || teamIds.length === 0) return;
-    setTeams(prev => prev.filter(team => !teamIds.includes(team.id)));
+    const updated = teams.filter(team => !teamIds.includes(team.id));
+    await persistTeams(updated);
   };
 
-  const clearJudgeScores = (judgeId, round, teamIds = null) => {
+  const clearJudgeScores = async (judgeId, round, teamIds = null) => {
     const roundKey = `round${round}`;
-    setTeams(prev =>
-      prev.map(team => {
-        if (teamIds && !teamIds.includes(team.id)) return team;
-        const judgeScores = team.scores?.[judgeId];
-        if (!judgeScores) return team;
+    const updated = teams.map(team => {
+      if (teamIds && !teamIds.includes(team.id)) return team;
+      const judgeScores = team.scores?.[judgeId];
+      if (!judgeScores) return team;
 
-        const updatedJudgeScores = { ...judgeScores };
-        delete updatedJudgeScores[roundKey];
+      const updatedJudgeScores = { ...judgeScores };
+      delete updatedJudgeScores[roundKey];
 
-        const updatedScores = { ...(team.scores || {}) };
-        if (Object.keys(updatedJudgeScores).length === 0) {
-          delete updatedScores[judgeId];
-        } else {
-          updatedScores[judgeId] = updatedJudgeScores;
-        }
+      const updatedScores = { ...(team.scores || {}) };
+      if (Object.keys(updatedJudgeScores).length === 0) {
+        delete updatedScores[judgeId];
+      } else {
+        updatedScores[judgeId] = updatedJudgeScores;
+      }
 
-        return { ...team, scores: updatedScores };
-      })
-    );
+      return { ...team, scores: updatedScores };
+    });
+    await persistTeams(updated);
   };
 
   const downloadRegistrationPdfReport = () => {
@@ -476,6 +766,99 @@ export default function NewApp() {
     reportWindow.document.close();
   };
 
+  const renderCurrentPage = () => {
+    switch (currentPage) {
+      case 'home':
+        return <HomePage onNavigate={setCurrentPage} />;
+      case 'participant-register':
+        return <RegisterPage onRegister={handleRegister} onNavigate={setCurrentPage} />;
+      case 'participant-login':
+        return <ParticipantLoginPage onLogin={handleParticipantLogin} onNavigate={setCurrentPage} />;
+      case 'admin-register':
+        return (
+          <AdminRegisterPage
+            onRegister={handleAdminRegister}
+            onNavigate={setCurrentPage}
+            registrationsClosed={adminAccounts.length >= MAX_ADMIN_ACCOUNTS}
+          />
+        );
+      case 'admin-login':
+        return (
+          <AdminLoginPage
+            onLogin={handleAdminLogin}
+            onNavigate={setCurrentPage}
+            registrationsClosed={adminAccounts.length >= MAX_ADMIN_ACCOUNTS}
+            showDefaultLogin={adminAccounts.length < MAX_ADMIN_ACCOUNTS}
+          />
+        );
+      case 'judge-register':
+        return <JudgeRegisterPage onRegister={handleJudgeRegister} onNavigate={setCurrentPage} />;
+      case 'judge-login':
+        return (
+          <JudgeLoginPage
+            onLogin={handleJudgeLogin}
+            onNavigate={setCurrentPage}
+            showDefaultLogin={judgeAccounts.length < MAX_JUDGE_ACCOUNTS}
+          />
+        );
+      case 'presentations':
+        return <PresentationPage teams={teams} onNavigate={setCurrentPage} />;
+      case 'final':
+        return <FinalPage teams={teams} onNavigate={setCurrentPage} />;
+      case 'admin-dashboard':
+        return user?.role === 'admin' ? (
+          <AdminDashboard
+            teams={teams}
+            contactMessages={contactMessages}
+            onSelectRound1={selectRound1}
+            onSelectRound2={selectRound2}
+            onDeleteTeams={deleteTeams}
+            onClearRoundSelections={clearRoundSelections}
+            onUpdateProductName={updateTeamProductName}
+            onDownloadReport={downloadRegistrationPdfReport}
+            onNavigate={setCurrentPage}
+          />
+        ) : (
+          <AdminLoginPage
+            onLogin={handleAdminLogin}
+            onNavigate={setCurrentPage}
+            registrationsClosed={adminAccounts.length >= MAX_ADMIN_ACCOUNTS}
+            showDefaultLogin={adminAccounts.length < MAX_ADMIN_ACCOUNTS}
+          />
+        );
+      case 'judge-dashboard':
+        return user?.role === 'judge' ? (
+          <JudgeDashboard
+            teams={teams}
+            onUpdateScores={updateTeamScores}
+            onClearScores={clearJudgeScores}
+            onNavigate={setCurrentPage}
+          />
+        ) : (
+          <JudgeLoginPage
+            onLogin={handleJudgeLogin}
+            onNavigate={setCurrentPage}
+            showDefaultLogin={judgeAccounts.length < MAX_JUDGE_ACCOUNTS}
+          />
+        );
+      case 'participant-dashboard':
+        return user?.role === 'participant' ? (
+          <ParticipantDashboard
+            user={user}
+            teams={teams}
+            onNavigate={setCurrentPage}
+            onUploadPoster={uploadTeamPoster}
+          />
+        ) : (
+          <ParticipantLoginPage onLogin={handleParticipantLogin} onNavigate={setCurrentPage} />
+        );
+      case 'contact':
+        return <ContactPage onNavigate={setCurrentPage} onSubmitMessage={submitContactMessage} />;
+      default:
+        return <HomePage onNavigate={setCurrentPage} />;
+    }
+  };
+
   return (
     <div className="adzap-container">
       {/* Header */}
@@ -523,59 +906,12 @@ export default function NewApp() {
 
       {/* Main Content */}
       <main className="adzap-main">
-        {currentPage === 'home' && <HomePage onNavigate={setCurrentPage} />}
-        {currentPage === 'participant-register' && <RegisterPage onRegister={handleRegister} onNavigate={setCurrentPage} />}
-        {currentPage === 'participant-login' && <ParticipantLoginPage onLogin={handleParticipantLogin} onNavigate={setCurrentPage} />}
-        {currentPage === 'admin-register' && (
-          <AdminRegisterPage
-            onRegister={handleAdminRegister}
-            onNavigate={setCurrentPage}
-            registrationsClosed={adminAccounts.length >= MAX_ADMIN_ACCOUNTS}
-          />
+        {backendRequiredError && (
+          <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
+            {backendRequiredError}
+          </div>
         )}
-        {currentPage === 'admin-login' && (
-          <AdminLoginPage
-            onLogin={handleAdminLogin}
-            onNavigate={setCurrentPage}
-            registrationsClosed={adminAccounts.length >= MAX_ADMIN_ACCOUNTS}
-            showDefaultLogin={adminAccounts.length < MAX_ADMIN_ACCOUNTS}
-          />
-        )}
-        {currentPage === 'judge-register' && <JudgeRegisterPage onRegister={handleJudgeRegister} onNavigate={setCurrentPage} />}
-        {currentPage === 'judge-login' && (
-          <JudgeLoginPage
-            onLogin={handleJudgeLogin}
-            onNavigate={setCurrentPage}
-            showDefaultLogin={judgeAccounts.length < MAX_JUDGE_ACCOUNTS}
-          />
-        )}
-        {currentPage === 'presentations' && <PresentationPage teams={teams} onNavigate={setCurrentPage} />}
-        {currentPage === 'final' && <FinalPage teams={teams} onNavigate={setCurrentPage} />}
-        {currentPage === 'admin-dashboard' && user?.role === 'admin' && (
-          <AdminDashboard
-            teams={teams}
-            contactMessages={contactMessages}
-            onSelectRound1={selectRound1}
-            onSelectRound2={selectRound2}
-            onDeleteTeams={deleteTeams}
-            onClearRoundSelections={clearRoundSelections}
-            onUpdateProductName={updateTeamProductName}
-            onDownloadReport={downloadRegistrationPdfReport}
-            onNavigate={setCurrentPage}
-          />
-        )}
-        {currentPage === 'judge-dashboard' && user?.role === 'judge' && (
-          <JudgeDashboard
-            teams={teams}
-            onUpdateScores={updateTeamScores}
-            onClearScores={clearJudgeScores}
-            onNavigate={setCurrentPage}
-          />
-        )}
-        {currentPage === 'participant-dashboard' && user?.role === 'participant' && (
-          <ParticipantDashboard user={user} teams={teams} onNavigate={setCurrentPage} onUploadPoster={uploadTeamPoster} />
-        )}
-        {currentPage === 'contact' && <ContactPage onNavigate={setCurrentPage} onSubmitMessage={submitContactMessage} />}
+        {renderCurrentPage()}
       </main>
 
       {/* Footer */}
@@ -585,5 +921,3 @@ export default function NewApp() {
     </div>
   );
 }
-
-

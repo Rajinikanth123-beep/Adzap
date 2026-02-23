@@ -139,7 +139,12 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
                 <img src={posterPreview} alt="Poster Preview" />
                 <button
                   className="upload-btn remove"
-                  onClick={() => setPosterPreview(null)}
+                  onClick={() => {
+                    setPosterPreview(null);
+                    if (onUploadPoster) {
+                      onUploadPoster(userTeam.id, null);
+                    }
+                  }}
                 >
                   Remove
                 </button>

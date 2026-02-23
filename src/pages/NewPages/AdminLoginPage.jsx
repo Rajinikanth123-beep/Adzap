@@ -5,10 +5,11 @@ export default function AdminLoginPage({ onLogin, onNavigate, registrationsClose
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (onLogin(email, password)) {
+    const isValid = await Promise.resolve(onLogin(email, password));
+    if (isValid) {
       setEmail('');
       setPassword('');
       return;

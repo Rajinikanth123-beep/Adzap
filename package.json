@@ -1,14 +1,17 @@
 {
   "name": "adzap-app",
-  
   "version": "0.1.0",
   "private": true,
+ 
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.13.5",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "mongoose": "^8.19.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3",
@@ -16,7 +19,11 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "concurrently -k -n BACKEND,FRONTEND \"npm:backend:dev\" \"npm:start:frontend\"",
+    "start:frontend": "set HOST=0.0.0.0&& react-scripts start",
+    "start:local": "react-scripts start",
+    "backend:start": "node backend/server.js",
+    "backend:dev": "nodemon backend/server.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "predeploy": "npm run build",
@@ -42,6 +49,8 @@
     ]
   },
   "devDependencies": {
-    "gh-pages": "^6.3.0"
+    "concurrently": "^9.2.1",
+    "gh-pages": "^6.3.0",
+    "nodemon": "^3.1.10"
   }
 }

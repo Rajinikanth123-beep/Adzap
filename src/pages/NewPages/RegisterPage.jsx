@@ -61,16 +61,20 @@ export default function RegisterPage({ onRegister, onNavigate }) {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError('');
-    if (formData.teamName && formData.email && formData.password) {
-      const result = onRegister(formData);
-      if (result?.success === false) {
-        setSubmitError(result.message || 'Registration failed');
-        return;
+    try {
+      if (formData.teamName && formData.email && formData.password) {
+        const result = await Promise.resolve(onRegister(formData));
+        if (result?.success === false) {
+          setSubmitError(result.message || 'Registration failed');
+          return;
+        }
+        alert('Registration successful! Please login.');
       }
-      alert('Registration successful! Please login.');
+    } catch (_error) {
+      setSubmitError('Registration failed. Please try again.');
     }
   };
 

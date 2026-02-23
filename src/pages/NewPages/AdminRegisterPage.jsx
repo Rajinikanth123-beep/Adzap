@@ -13,14 +13,14 @@ export default function AdminRegisterPage({ onRegister, onNavigate, registration
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (registrationsClosed) {
       setError('Admin registrations are closed. Maximum 6 admins reached.');
       return;
     }
     setError('');
-    const result = onRegister(formData);
+    const result = await Promise.resolve(onRegister(formData));
     const success = typeof result === 'boolean' ? result : result?.success;
     const message = typeof result === 'boolean' ? 'Admin with this email already exists' : result?.message;
 
