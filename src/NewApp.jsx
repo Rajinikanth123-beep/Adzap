@@ -549,20 +549,6 @@ export default function NewApp() {
     }
   };
 
-  useEffect(() => {
-    if (isBootstrapping) return;
-
-    if (currentPage === 'participant-dashboard' && user?.role !== 'participant') {
-      setCurrentPage('participant-login');
-    }
-    if (currentPage === 'admin-dashboard' && user?.role !== 'admin') {
-      setCurrentPage('admin-login');
-    }
-    if (currentPage === 'judge-dashboard' && user?.role !== 'judge') {
-      setCurrentPage('judge-login');
-    }
-  }, [currentPage, user, isBootstrapping]);
-
   const openAdminSection = () => {
     if (user?.role === 'admin') {
       setCurrentPage('admin-dashboard');
