@@ -33,37 +33,38 @@ export default function HomePage() {
         <h2 className="section-title">Key Features</h2>
         <div className="grid-3">
           <div className="card">
-            <div className="feature-icon">📝</div>
+            <div className="feature-icon">📝 Registration</div>
             <h3>Team Registration</h3>
             <p>Easy online registration with team and participant details</p>
           </div>
           <div className="card">
-            <div className="feature-icon">🧑‍⚖️</div>
+            <div className="feature-icon">⚖️ Judges</div>
             <h3>Multi-Judge System</h3>
             <p>Multiple judges scoring with automatic average calculation</p>
           </div>
           <div className="card">
-            <div className="feature-icon">🏆</div>
+            <div className="feature-icon">🏆 Rankings</div>
             <h3>Live Rankings</h3>
             <p>Real-time leaderboard with automatic rankings</p>
           </div>
           <div className="card">
-            <div className="feature-icon">🎬</div>
+            <div className="feature-icon">🎬 Present</div>
             <h3>Presentation Mode</h3>
             <p>Fullscreen presentation view with team posters</p>
           </div>
           <div className="card">
-            <div className="feature-icon">📊</div>
+            <div className="feature-icon">📊 Admin</div>
             <h3>Admin Dashboard</h3>
             <p>Complete control over teams, rounds, and selections</p>
           </div>
           <div className="card">
-            <div className="feature-icon">📱</div>
+            <div className="feature-icon">📱 Mobile</div>
             <h3>Mobile Ready</h3>
             <p>Responsive design works on all devices</p>
           </div>
         </div>
       </section>
+
       <section className="contact-info-section">
         <h2 className="section-title">Need Help?</h2>
         <div className="contact-grid">
@@ -112,7 +113,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
 
       <style>{`
         .home-page {
@@ -190,60 +190,6 @@ export default function HomePage() {
           letter-spacing: 0.3px;
         }
 
-        .auth-sections {
-          display: grid;
-          grid-template-columns: repeat(3, minmax(220px, 1fr));
-          gap: 1rem;
-          align-items: stretch;
-        }
-
-        .auth-card {
-          background: rgba(10, 14, 39, 0.55);
-          border: 2px solid rgba(34, 211, 238, 0.2);
-          border-radius: 10px;
-          padding: 1rem;
-          text-align: left;
-        }
-
-        .participant-auth {
-          border-color: rgba(34, 211, 238, 0.45);
-          box-shadow: 0 8px 20px rgba(34, 211, 238, 0.12);
-        }
-
-        .auth-card h3 {
-          color: #22d3ee;
-          margin-bottom: 0.8rem;
-          font-size: 1rem;
-        }
-
-        .auth-buttons {
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-        }
-
-        .btn-primary {
-          background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
-        }
-
-        .btn-secondary {
-          background: transparent;
-          border: 2px solid #22d3ee;
-          color: #22d3ee;
-        }
-
-        .btn-secondary:hover {
-          background: rgba(34, 211, 238, 0.1);
-        }
-
-        .event-sections {
-          display: flex;
-          gap: 1rem;
-          justify-content: center;
-          margin-top: 1rem;
-          flex-wrap: wrap;
-        }
-
         .section-title {
           font-size: 2.5rem;
           text-align: center;
@@ -260,7 +206,9 @@ export default function HomePage() {
         }
 
         .feature-icon {
-          font-size: 3rem;
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: #22d3ee;
           margin-bottom: 1rem;
         }
 
@@ -289,7 +237,6 @@ export default function HomePage() {
           font-size: 1.3rem;
         }
 
-        
         .person-list {
           display: flex;
           flex-direction: column;
@@ -342,14 +289,6 @@ export default function HomePage() {
             font-size: 0.86rem;
           }
 
-          .auth-sections {
-            grid-template-columns: 1fr;
-          }
-
-          .event-sections {
-            flex-direction: column;
-          }
-
           .btn {
             width: 100%;
           }
@@ -362,8 +301,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-
-
-
