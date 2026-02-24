@@ -311,6 +311,33 @@ export default function NewApp() {
     return { success: true };
   };
 
+  const deleteContactMessage = async (messageId) => {
+    if (!messageId) return { success: false, message: 'Invalid message id' };
+
+    if (backendAvailable) {
+      try {
+        await callApi('delete', `/api/contact-messages/${messageId}`);
+        setContactMessages(prev => prev.filter(message => message.id !== messageId));
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          message: getApiErrorMessage(error, 'Failed to delete contact message'),
+        };
+      }
+    }
+
+    if (!LOCAL_FALLBACK_ENABLED) {
+      return {
+        success: false,
+        message: 'Backend is unavailable. Please try again once server is online.',
+      };
+    }
+
+    setContactMessages(prev => prev.filter(message => message.id !== messageId));
+    return { success: true };
+  };
+
   const handleRegister = async (teamData) => {
     if (backendAvailable) {
       try {
@@ -892,6 +919,7 @@ export default function NewApp() {
           <AdminDashboard
             teams={teams}
             contactMessages={contactMessages}
+            onDeleteContactMessage={deleteContactMessage}
             onSelectRound1={selectRound1}
             onSelectRound2={selectRound2}
             onDeleteTeams={deleteTeams}

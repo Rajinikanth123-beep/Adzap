@@ -1,22 +1,6 @@
 import React from 'react';
 
 export default function HomePage() {
-  const sendWhatsApp = (phone) => {
-    const cleanPhone = String(phone || '').replace(/\D/g, '');
-
-    const formattedPhone = cleanPhone.startsWith('91')
-      ? cleanPhone
-      : `91${cleanPhone}`;
-
-    const website = 'https://adzap-lilac.vercel.app/';
-
-    const message = `Hello 👋\nVisit ADZAP website here:\n${website}`;
-
-    const url = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-
-    window.open(url, '_blank');
-  };
-
   return (
     <div className="home-page">
       <section className="hero-section">
@@ -119,13 +103,6 @@ export default function HomePage() {
               <div className="person-box">
                 <p className="person-name">Phone</p>
                 <p className="person-contact">+91-9392485881</p>
-                <button
-                  type="button"
-                  className="wa-btn"
-                  onClick={() => sendWhatsApp('+91-9392485881')}
-                >
-                  Share via WhatsApp
-                </button>
               </div>
               <div className="person-box">
                 <p className="person-name">Email</p>
@@ -341,24 +318,6 @@ export default function HomePage() {
           word-break: break-word;
         }
 
-        .wa-btn {
-          margin-top: 0.55rem;
-          border: 1px solid rgba(34, 197, 94, 0.45);
-          background: linear-gradient(135deg, rgba(22, 163, 74, 0.35) 0%, rgba(34, 197, 94, 0.22) 100%);
-          color: #dcfce7;
-          border-radius: 8px;
-          padding: 0.42rem 0.6rem;
-          cursor: pointer;
-          font-size: 0.8rem;
-          font-weight: 700;
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .wa-btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 8px 16px rgba(34, 197, 94, 0.25);
-        }
-
         @keyframes fadeIn {
           from {
             opacity: 0;
@@ -403,6 +362,8 @@ export default function HomePage() {
     </div>
   );
 }
+
+
 
 
 

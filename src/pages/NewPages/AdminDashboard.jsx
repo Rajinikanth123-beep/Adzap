@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function AdminDashboard({ teams, contactMessages = [], onSelectRound1, onSelectRound2, onDeleteTeams, onClearRoundSelections, onUpdateProductName, onDownloadReport, onNavigate }) {
+export default function AdminDashboard({ teams, contactMessages = [], onDeleteContactMessage, onSelectRound1, onSelectRound2, onDeleteTeams, onClearRoundSelections, onUpdateProductName, onDownloadReport, onNavigate }) {
   const [selectedTeams, setSelectedTeams] = useState([]);
   const [currentRound, setCurrentRound] = useState(1);
 
@@ -99,6 +99,19 @@ export default function AdminDashboard({ teams, contactMessages = [], onSelectRo
   const formatMessageTime = (isoTime) => {
     if (!isoTime) return '-';
     return new Date(isoTime).toLocaleString();
+  };
+
+  const deleteContactMessage = async (messageId) => {
+    const confirmDelete = window.confirm('Delete this contact message? This cannot be undone.');
+    if (!confirmDelete) return;
+
+    if (typeof onDeleteContactMessage !== 'function') return;
+    const result = await onDeleteContactMessage(messageId);
+    if (!result?.success) {
+      alert(result?.message || 'Failed to delete contact message');
+      return;
+    }
+    alert('Contact message deleted');
   };
 
   return (
@@ -242,6 +255,15 @@ export default function AdminDashboard({ teams, contactMessages = [], onSelectRo
                     <p><strong>Phone:</strong> {message.phone || '-'}</p>
                     <p><strong>Subject:</strong> {message.subject || '-'}</p>
                     <p><strong>Message:</strong> {message.message || '-'}</p>
+                    <div className="message-actions">
+                      <button
+                        type="button"
+                        className="message-delete-btn"
+                        onClick={() => deleteContactMessage(message.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -576,6 +598,29 @@ export default function AdminDashboard({ teams, contactMessages = [], onSelectRo
           color: #8a92a1;
           font-size: 0.75rem;
           white-space: nowrap;
+        }
+
+        .message-actions {
+          display: flex;
+          justify-content: flex-end;
+          margin-top: 0.5rem;
+        }
+
+        .message-delete-btn {
+          background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+          border: none;
+          color: #fff;
+          border-radius: 6px;
+          padding: 0.35rem 0.65rem;
+          font-size: 0.78rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .message-delete-btn:hover {
+          box-shadow: 0 6px 14px rgba(239, 68, 68, 0.3);
+          transform: translateY(-1px);
         }
 
         .stats-grid {

@@ -242,6 +242,36 @@ app.post("/api/contact-messages", async (req, res, next) => {
   }
 });
 
+app.delete("/api/contact-messages/:id", async (req, res, next) => {
+  try {
+    const messageId = Number(req.params.id);
+    if (!Number.isFinite(messageId)) {
+      return res.status(400).json({ message: "Invalid message id" });
+    }
+
+    if (USE_MONGO) {
+      const deleted = await ContactMessageModel.findOneAndDelete({ id: messageId }).lean();
+      if (!deleted) {
+        return res.status(404).json({ message: "Contact message not found" });
+      }
+      return res.json({ success: true });
+    }
+
+    const store = await readStore();
+    const previousLength = store.contactMessages.length;
+    store.contactMessages = store.contactMessages.filter(
+      (message) => Number(message.id) !== messageId
+    );
+    if (store.contactMessages.length === previousLength) {
+      return res.status(404).json({ message: "Contact message not found" });
+    }
+    await writeStore(store);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/teams/register", async (req, res, next) => {
   try {
     const {
