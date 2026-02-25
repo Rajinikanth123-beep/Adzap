@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 export default function HomePage({ onNavigate }) {
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
 
   const isIOS = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
@@ -17,6 +18,7 @@ export default function HomePage({ onNavigate }) {
     const handleBeforeInstallPrompt = (event) => {
       event.preventDefault();
       setInstallPromptEvent(event);
+      setShowInstallButton(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -34,8 +36,13 @@ export default function HomePage({ onNavigate }) {
   const handleDownloadApp = async () => {
     if (installPromptEvent) {
       installPromptEvent.prompt();
-      await installPromptEvent.userChoice;
+      const { outcome } = await installPromptEvent.userChoice;
       setInstallPromptEvent(null);
+      setShowInstallButton(false);
+
+      if (outcome === 'accepted') {
+        return;
+      }
       return;
     }
 
@@ -49,6 +56,7 @@ export default function HomePage({ onNavigate }) {
 
   return (
     <div className="home-page">
+
       <section className="hero-section">
         <div className="hero-image-wrap">
           <img
@@ -76,9 +84,11 @@ export default function HomePage({ onNavigate }) {
             <button type="button" className="btn hero-register-btn" onClick={openParticipantRegistration}>
               Participant Registration
             </button>
-            <button type="button" className="btn hero-download-btn" onClick={handleDownloadApp}>
-              Download ADZAP App
-            </button>
+            {showInstallButton && (
+              <button type="button" className="btn hero-download-btn" onClick={handleDownloadApp}>
+                Download ADZAP App
+              </button>
+            )}
           </div>
         </div>
       </section>
