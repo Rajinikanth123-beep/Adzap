@@ -6,7 +6,7 @@ export default function HomePage() {
       <section className="hero-section">
         <div className="hero-image-wrap">
           <img
-            src="https://res.cloudinary.com/dllobgxw0/image/upload/v1771830616/ChatGPT_Image_Feb_23_2026_12_38_33_PM_dng7yb.png"
+            src="https://res.cloudinary.com/dllobgxw0/image/upload/v1772024626/Adzap1_fh5d2k.png"
             alt="ADZAP Event Poster"
             className="hero-image"
             onError={(e) => {
