@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
 
-export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, onNavigate }) {
-  const [currentJudge, setCurrentJudge] = useState('judge1');
+export default function JudgeDashboard({ user, teams, onUpdateScores, onClearScores, onNavigate }) {
   const [currentRound, setCurrentRound] = useState(1);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
+
+  const currentJudge = (() => {
+    const email = String(user?.email || '').trim().toLowerCase();
+    if (email.includes('judge1')) return 'judge1';
+    if (email.includes('judge2')) return 'judge2';
+    if (email) return email;
+    return 'judge1';
+  })();
 
   const getTeamsForRound = () => {
     if (currentRound === 1) return teams;
@@ -34,6 +41,10 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
   };
 
   const teamsToDisplay = getTeamsForRound();
+  const getParticipantNames = (team) => {
+    if (!Array.isArray(team?.members) || team.members.length === 0) return 'No participants added';
+    return team.members.map((member) => member?.name || 'Unnamed').join(', ');
+  };
 
   const clearCurrentRoundScores = () => {
     const confirmClear = window.confirm(`Clear all scores for ${currentJudge} in Round ${currentRound}?`);
@@ -56,15 +67,12 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
 
   return (
     <div className="judge-dashboard">
-      <h1>Judge Scoring Panel</h1>
+      <h1>Judge  Scoring Panel</h1>
 
       <div className="judge-controls">
         <div className="control-group">
-          <label>Judge ID:</label>
-          <select value={currentJudge} onChange={(e) => setCurrentJudge(e.target.value)} className="select-field">
-            <option value="judge1">Judge 1</option>
-            <option value="judge2">Judge 2</option>
-          </select>
+          <label>Judge:</label>
+          <div className="judge-identity">{user?.name || user?.email || currentJudge}</div>
         </div>
 
         <div className="control-group">
@@ -84,20 +92,17 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
         </div>
       </div>
 
-      <div className="judge-summary">
-        Current Judge: {currentJudge} | Scored: {teamsToDisplay.filter((t) => getTeamScore(t) !== '-').length} / {teamsToDisplay.length} teams
-      </div>
-
       <div className="teams-scoring-container">
         <div className="teams-scoring">
-          <h2>Team Scores (Round {currentRound})</h2>
+          <h2>Team Score (Round {currentRound})</h2>
           <div className="scoring-table-container">
             <table className="scoring-table">
               <thead>
                 <tr>
                   <th>Team Name</th>
+                  <th>Participants</th>
                   <th>Product</th>
-                  <th>Score (0-10)</th>
+                  <th>Team Score (0-10)</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -109,6 +114,7 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
                     onClick={() => setSelectedTeamId(team.id)}
                   >
                     <td className="team-name">{team.teamName}</td>
+                    <td className="participant-names">{getParticipantNames(team)}</td>
                     <td className="product-name">{team.productName}</td>
                     <td className="score-cell">
                       <input
@@ -119,7 +125,7 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
                         value={getTeamScore(team) === '-' ? '' : getTeamScore(team)}
                         onChange={(e) => handleScoreChange(team.id, parseFloat(e.target.value) || 0)}
                         className="score-input"
-                        placeholder="0"
+                        placeholder="Score"
                       />
                       <span className="score-max">/10</span>
                     </td>
@@ -207,6 +213,15 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
           border-radius: 6px;
           min-width: 150px;
         }
+        .judge-identity {
+          padding: 0.6rem 1rem;
+          background: rgba(0, 0, 0, 0.4);
+          border: 2px solid rgba(34, 211, 238, 0.2);
+          color: #e2e8f0;
+          border-radius: 6px;
+          min-width: 150px;
+          font-weight: 600;
+        }
         .round-buttons { display: flex; gap: 0.5rem; }
         .round-btn {
           padding: 0.6rem 1.2rem;
@@ -222,15 +237,6 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
           border-color: transparent;
         }
         .round-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .judge-summary {
-          margin-bottom: 1rem;
-          padding: 0.8rem 1rem;
-          border-radius: 8px;
-          border: 1px solid rgba(34, 211, 238, 0.3);
-          background: rgba(34, 211, 238, 0.08);
-          color: #e2e8f0;
-          font-weight: 600;
-        }
         .teams-scoring-container { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; margin-bottom: 2rem; align-items: start; }
         .teams-scoring {
           background: linear-gradient(135deg, rgba(10, 15, 35, 0.7) 0%, rgba(34, 211, 238, 0.05) 100%);
@@ -250,6 +256,7 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
         .scoring-table td { padding: 1rem; border-bottom: 1px solid rgba(34, 211, 238, 0.1); color: #a0aab9; }
         .team-name { color: #22d3ee; font-weight: 600; }
         .product-name { font-size: 0.9rem; color: #8a92a1; }
+        .participant-names { font-size: 0.85rem; color: #cbd5e1; max-width: 280px; }
         .score-cell { display: flex; align-items: center; gap: 0.5rem; }
         .score-input {
           width: 80px;
@@ -320,7 +327,7 @@ export default function JudgeDashboard({ teams, onUpdateScores, onClearScores, o
           .judge-dashboard h1 { font-size: 1.8rem; }
           .judge-controls { flex-direction: column; gap: 1rem; }
           .control-group { flex-direction: column; width: 100%; }
-          .select-field { width: 100%; }
+          .judge-identity { width: 100%; }
           .teams-scoring-container { grid-template-columns: 1fr; }
           .poster-preview-panel { max-height: 400px; position: static; }
         }

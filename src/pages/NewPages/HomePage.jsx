@@ -1,6 +1,52 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-export default function HomePage() {
+export default function HomePage({ onNavigate }) {
+  const [installPromptEvent, setInstallPromptEvent] = useState(null);
+
+  const isIOS = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent);
+  }, []);
+
+  const isStandalone = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPromptEvent(event);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const openParticipantRegistration = () => {
+    if (typeof onNavigate === 'function') {
+      onNavigate('participant-register');
+    }
+  };
+
+  const handleDownloadApp = async () => {
+    if (installPromptEvent) {
+      installPromptEvent.prompt();
+      await installPromptEvent.userChoice;
+      setInstallPromptEvent(null);
+      return;
+    }
+
+    if (isIOS && !isStandalone) {
+      alert('On iPhone: tap Share icon and choose "Add to Home Screen" to install ADZAP app.');
+      return;
+    }
+
+    alert('Install option is not ready in this browser yet. Open in Chrome mobile and try again.');
+  };
+
   return (
     <div className="home-page">
       <section className="hero-section">
@@ -25,6 +71,14 @@ export default function HomePage() {
           <div className="event-banner">
             <span className="event-pill">DEFEND-X 2K26</span>
             <span className="event-pill">RIPPLE-2K26</span>
+          </div>
+          <div className="hero-actions">
+            <button type="button" className="btn hero-register-btn" onClick={openParticipantRegistration}>
+              Participant Registration
+            </button>
+            <button type="button" className="btn hero-download-btn" onClick={handleDownloadApp}>
+              Download ADZAP App
+            </button>
           </div>
         </div>
       </section>
@@ -188,6 +242,24 @@ export default function HomePage() {
           font-weight: 700;
           font-size: 0.86rem;
           letter-spacing: 0.3px;
+        }
+
+        .hero-actions {
+          margin-top: 1rem;
+          display: flex;
+          justify-content: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+
+        .hero-register-btn {
+          min-width: 240px;
+        }
+
+        .hero-download-btn {
+          min-width: 240px;
+          background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+          box-shadow: 0 10px 24px rgba(34, 197, 94, 0.3);
         }
 
         .section-title {

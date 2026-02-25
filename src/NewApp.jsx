@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import './NewApp.css';
 import logo from './logo.svg';
@@ -64,6 +64,8 @@ export default function NewApp() {
   const [backendRequiredError, setBackendRequiredError] = useState('');
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [hasHydratedSession, setHasHydratedSession] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const headerMenuRef = useRef(null);
 
   const dedupeTeams = useCallback((teamList = []) => {
     const byEmailOrId = new Map();
@@ -616,29 +618,44 @@ export default function NewApp() {
     }
   };
 
-  const openAdminSection = () => {
-    if (user?.role === 'admin') {
-      setCurrentPage('admin-dashboard');
-      return;
-    }
-    setCurrentPage('admin-login');
+  const headerMenuOptions = [
+    { key: 'home', label: 'Home', action: () => setCurrentPage('home') },
+    
+    { key: 'participant-login', label: 'Participant Login', action: () => setCurrentPage('participant-login') },
+    
+    
+    { key: 'admin-login', label: 'Admin Login', action: () => setCurrentPage('admin-login') },
+    
+    
+    { key: 'judge-login', label: 'Judge Login', action: () => setCurrentPage('judge-login') },
+    
+    { key: 'presentations', label: 'Presentations', action: () => setCurrentPage('presentations') },
+    { key: 'final', label: 'Finalist', action: () => setCurrentPage('final') },
+    { key: 'contact', label: 'Contact', action: () => setCurrentPage('contact') },
+    ...(user ? [{ key: 'logout', label: 'Logout', action: handleLogout }] : []),
+  ];
+
+  const handleHeaderMenuAction = (action) => {
+    setHeaderMenuOpen(false);
+    action();
   };
 
-  const openParticipantSection = () => {
-    if (user?.role === 'participant') {
-      setCurrentPage('participant-dashboard');
-      return;
-    }
-    setCurrentPage('participant-login');
-  };
+  useEffect(() => {
+    const onClickOutside = (event) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(event.target)) {
+        setHeaderMenuOpen(false);
+      }
+    };
 
-  const openJudgeSection = () => {
-    if (user?.role === 'judge') {
-      setCurrentPage('judge-dashboard');
-      return;
-    }
-    setCurrentPage('judge-login');
-  };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    setHeaderMenuOpen(false);
+  }, [currentPage]);
 
   const updateTeamScores = async (teamId, judgeId, score) => {
     const updated = teams.map(team => {
@@ -940,6 +957,7 @@ export default function NewApp() {
       case 'judge-dashboard':
         return user?.role === 'judge' ? (
           <JudgeDashboard
+            user={user}
             teams={teams}
             onUpdateScores={updateTeamScores}
             onClearScores={clearJudgeScores}
@@ -998,30 +1016,33 @@ export default function NewApp() {
             />
             <h1 className="adzap-logo">⚡ ADZAP-DefendX</h1>
           </div>
-          <nav className="nav-menu">
-            {!user ? (
-              <>
-                <button onClick={() => setCurrentPage('home')} className="nav-btn">Home</button>
-                <button onClick={openParticipantSection} className="nav-btn">Participant</button>
-                <button onClick={openAdminSection} className="nav-btn">Admin</button>
-                <button onClick={openJudgeSection} className="nav-btn">Judge</button>
-                <button onClick={() => setCurrentPage('presentations')} className="nav-btn">Presentations</button>
-                <button onClick={() => setCurrentPage('final')} className="nav-btn">Final</button>
-                <button onClick={() => setCurrentPage('contact')} className="nav-btn">Contact</button>
-              </>
-            ) : (
-              <>
-                <span className="user-badge">{user.role.toUpperCase()}</span>
-                <button onClick={() => setCurrentPage('home')} className="nav-btn">Home</button>
-                <button onClick={openParticipantSection} className="nav-btn">Participant</button>
-                <button onClick={openAdminSection} className="nav-btn">Admin</button>
-                <button onClick={openJudgeSection} className="nav-btn">Judge</button>
-                <button onClick={() => setCurrentPage('presentations')} className="nav-btn">Presentations</button>
-                <button onClick={() => setCurrentPage('final')} className="nav-btn">Final</button>
-                <button onClick={() => setCurrentPage('contact')} className="nav-btn">Contact</button>
-                <button onClick={handleLogout} className="logout-btn">Logout</button>
-              </>
-            )}
+          <nav className="nav-menu menu-overlay-mode">
+            <div className="header-menu-wrap" ref={headerMenuRef}>
+              {user && <span className="user-badge">{user.role.toUpperCase()}</span>}
+              <button
+                type="button"
+                className="header-menu-btn"
+                onClick={() => setHeaderMenuOpen((prev) => !prev)}
+                aria-label="Open header menu"
+                aria-expanded={headerMenuOpen}
+              >
+                ☰
+              </button>
+              {headerMenuOpen && (
+                <div className="header-menu-dropdown">
+                  {headerMenuOptions.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={`header-menu-item ${item.key === 'logout' ? 'danger' : ''}`}
+                      onClick={() => handleHeaderMenuAction(item.action)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
         </div>
       </header>
