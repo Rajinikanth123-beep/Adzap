@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function AdminDashboard({ teams, contactMessages = [], onDeleteContactMessage, onSelectRound1, onSelectRound2, onDeleteTeams, onClearRoundSelections, onUpdateProductName, onDownloadReport, onNavigate }) {
+export default function AdminDashboard({ teams, contactMessages = [], onDeleteContactMessage, onSelectRound1, onSelectRound2, onDeleteTeams, onClearRoundSelections, onUpdateProductName, onUpdateScores, onDownloadReport, onNavigate }) {
   const [selectedTeams, setSelectedTeams] = useState([]);
   const [currentRound, setCurrentRound] = useState(1);
 
@@ -60,6 +60,35 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
 
     if (judgeScores.length === 0) return null;
     return judgeScores.reduce((a, b) => a + b, 0) / judgeScores.length;
+  };
+
+  const getScoreValue = (team, judgeId, round) => {
+    const judgeData = team?.scores?.[judgeId];
+    if (!judgeData) return '';
+
+    const roundKey = `round${round}`;
+    if (judgeData[roundKey] !== undefined && judgeData[roundKey] !== null) {
+      return judgeData[roundKey];
+    }
+
+    if (judgeData.round === round && judgeData.score !== undefined && judgeData.score !== null) {
+      return judgeData.score;
+    }
+
+    return '';
+  };
+
+  const handleAdminScoreChange = (teamId, judgeId, rawScore) => {
+    if (typeof onUpdateScores !== 'function') return;
+    if (rawScore === '') return;
+
+    const parsedScore = Number(rawScore);
+    if (!Number.isFinite(parsedScore)) return;
+
+    onUpdateScores(teamId, judgeId, {
+      round: currentRound,
+      score: Math.min(10, Math.max(0, parsedScore)),
+    });
   };
 
   const clearSelection = () => {
@@ -149,6 +178,8 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
                   <th>Select</th>
                   <th>Team Name</th>
                   <th>{currentRound === 2 ? 'Product Name (Admin)' : 'Product'}</th>
+                  <th>Judge 1</th>
+                  <th>Judge 2</th>
                   <th>Average (Round {currentRound})</th>
                   <th>Delete</th>
                 </tr>
@@ -176,6 +207,30 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
                       ) : (
                         team.productName
                       )}
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.5"
+                        value={getScoreValue(team, 'judge1', currentRound)}
+                        onChange={(e) => handleAdminScoreChange(team.id, 'judge1', e.target.value)}
+                        className="score-input"
+                        placeholder="-"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        max="10"
+                        step="0.5"
+                        value={getScoreValue(team, 'judge2', currentRound)}
+                        onChange={(e) => handleAdminScoreChange(team.id, 'judge2', e.target.value)}
+                        className="score-input"
+                        placeholder="-"
+                      />
                     </td>
                     <td>{getAverageScore(team, currentRound)?.toFixed(2) ?? '-'}</td>
                     <td>
@@ -403,6 +458,23 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
         }
 
         .product-input:focus {
+          outline: none;
+          border-color: #22d3ee;
+          box-shadow: 0 0 8px rgba(34, 211, 238, 0.25);
+        }
+
+        .score-input {
+          width: 78px;
+          padding: 0.45rem 0.55rem;
+          background: rgba(0, 0, 0, 0.4);
+          border: 1px solid rgba(34, 211, 238, 0.35);
+          color: #e2e8f0;
+          border-radius: 5px;
+          font-size: 0.85rem;
+          text-align: center;
+        }
+
+        .score-input:focus {
           outline: none;
           border-color: #22d3ee;
           box-shadow: 0 0 8px rgba(34, 211, 238, 0.25);

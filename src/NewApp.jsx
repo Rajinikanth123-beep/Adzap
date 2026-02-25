@@ -925,6 +925,7 @@ export default function NewApp() {
             onDeleteTeams={deleteTeams}
             onClearRoundSelections={clearRoundSelections}
             onUpdateProductName={updateTeamProductName}
+            onUpdateScores={updateTeamScores}
             onDownloadReport={downloadRegistrationPdfReport}
             onNavigate={setCurrentPage}
           />

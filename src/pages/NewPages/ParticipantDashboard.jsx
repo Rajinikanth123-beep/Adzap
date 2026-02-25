@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
 
 export default function ParticipantDashboard({ user, teams, onNavigate, onUploadPoster }) {
-  const userTeam = user ? teams.find(t => t.id === (user.teamId || user.id)) : null;
+  const userTeam = user ? teams.find((t) => t.id === (user.teamId || user.id)) : null;
   const [posterPreview, setPosterPreview] = useState(userTeam?.poster || null);
+  const icons = {
+    check: '\u2713',
+    arrow: '\u2192',
+    member: '\u{1F464}',
+    phone: '\u260E',
+    email: '\u2709',
+    file: '\u{1F4C4}',
+    tip: '\u{1F4A1}',
+    back: '\u2190',
+  };
 
   if (!userTeam) {
     return (
@@ -21,35 +31,18 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
   const round1Selected = userTeam.round1?.selected || false;
   const round2Selection = userTeam.round2?.selected || false;
 
-  const sendWhatsApp = (phone) => {
-    const cleanPhone = String(phone || '').replace(/\D/g, '');
-    if (!cleanPhone) return;
-
-    const formattedPhone = cleanPhone.startsWith('91')
-      ? cleanPhone
-      : `91${cleanPhone}`;
-
-    const website = 'https://adzap-lilac.vercel.app/';
-    const message = `Hello 👋\nVisit ADZAP website here:\n${website}`;
-    const url = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
-
-    window.open(url, '_blank');
-  };
-
   const handlePosterUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Check file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         alert('File size exceeds 5MB limit');
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const posterData = event.target.result;
         setPosterPreview(posterData);
-        // Save to parent state for persistence
         if (onUploadPoster) {
           onUploadPoster(userTeam.id, posterData);
         }
@@ -62,7 +55,6 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
     <div className="participant-dashboard">
       <h1>Team Dashboard</h1>
 
-      {/* Team Info Card */}
       <div className="team-info-card">
         <div className="team-header">
           <h2>{userTeam.teamName}</h2>
@@ -84,74 +76,57 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
         </div>
       </div>
 
-      {/* Progress Tracker */}
       <div className="progress-section">
         <h3>Competition Progress</h3>
         <div className="progress-container">
-          {/* Round 1 */}
           <div className={`progress-step ${round1Selected ? 'completed' : 'pending'}`}>
-            <div className="step-icon">
-              {round1Selected ? '✓' : '1'}
-            </div>
+            <div className="step-icon">{round1Selected ? icons.check : '1'}</div>
             <div className="step-content">
               <h4>Round 1: Presentation</h4>
-              <p className="step-status">
-                {round1Selected ? 'Selected' : 'Not Selected'}
-              </p>
+              <p className="step-status">{round1Selected ? 'Selected' : 'Not Selected'}</p>
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="progress-arrow">→</div>
+          <div className="progress-arrow">{icons.arrow}</div>
 
-          {/* Round 2 */}
-          <div className={`progress-step ${round2Selection ? 'completed' : round1Selected ? 'active' : 'disabled'}`}>
-            <div className="step-icon">
-              {round2Selection ? '✓' : '2'}
-            </div>
+          <div
+            className={`progress-step ${
+              round2Selection ? 'completed' : round1Selected ? 'active' : 'disabled'
+            }`}
+          >
+            <div className="step-icon">{round2Selection ? icons.check : '2'}</div>
             <div className="step-content">
               <h4>Round 2: Finals</h4>
-              <p className="step-status">
-                {round2Selection ? 'Selected' : 'Not Selected'}
-              </p>
+              <p className="step-status">{round2Selection ? 'Selected' : 'Not Selected'}</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Members Grid */}
       <div className="members-section">
         <h3>Team Members ({userTeam.members?.length || 0})</h3>
         <div className="members-grid">
           {userTeam.members?.map((member, idx) => (
             <div key={idx} className="member-card">
-              <div className="member-icon">👤</div>
+              <div className="member-icon">{icons.member}</div>
               <h4>{member.name}</h4>
               <div className="member-info">
                 <p>
                   <a href={`tel:${member.phone}`} className="info-link">
-                    📱 {member.phone}
+                    {icons.phone} {member.phone}
                   </a>
                 </p>
                 <p>
                   <a href={`mailto:${member.email}`} className="info-link">
-                    ✉️ {member.email}
+                    {icons.email} {member.email}
                   </a>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => sendWhatsApp(member.phone)}
-                  className="whatsapp-btn"
-                >
-                  Send WhatsApp
-                </button>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Poster Upload Section */}
       {round1Selected && (
         <div className="poster-section">
           <h3>Project Poster / Documentation</h3>
@@ -180,7 +155,7 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
                   style={{ display: 'none' }}
                 />
                 <div className="upload-box">
-                  <p className="upload-icon">📄</p>
+                  <p className="upload-icon">{icons.file}</p>
                   <p className="upload-text">Click to upload poster or documentation</p>
                   <p className="upload-hint">PNG, JPG, or PDF (Max 5MB)</p>
                 </div>
@@ -188,18 +163,15 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
             )}
           </div>
           <p className="upload-note">
-            💡 Upload your project poster or documentation for judges' reference during Round 2.
+            {icons.tip} Upload your project poster or documentation for judges' reference during
+            Round 2.
           </p>
         </div>
       )}
 
-      {/* Quick Links */}
       <div className="quick-links">
-        <button
-          className="link-btn"
-          onClick={() => onNavigate('home')}
-        >
-          ← Back to Home
+        <button className="link-btn" onClick={() => onNavigate('home')}>
+          {icons.back} Back to Home
         </button>
       </div>
 
@@ -211,7 +183,11 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
         .no-team-message {
           text-align: center;
           padding: 3rem 2rem;
-          background: linear-gradient(135deg, rgba(10, 15, 35, 0.7) 0%, rgba(34, 211, 238, 0.05) 100%);
+          background: linear-gradient(
+            135deg,
+            rgba(10, 15, 35, 0.7) 0%,
+            rgba(34, 211, 238, 0.05) 100%
+          );
           border: 2px solid rgba(34, 211, 238, 0.2);
           border-radius: 12px;
           margin: 2rem 0;
@@ -404,15 +380,15 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
 
         .members-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 1rem;
+          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+          gap: 1.25rem;
         }
 
         .member-card {
           background: linear-gradient(135deg, rgba(10, 15, 35, 0.7) 0%, rgba(34, 211, 238, 0.05) 100%);
           border: 2px solid rgba(34, 211, 238, 0.2);
           border-radius: 8px;
-          padding: 1.5rem;
+          padding: 1.9rem;
           text-align: center;
           transition: all 0.3s ease;
         }
@@ -424,13 +400,14 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
         }
 
         .member-icon {
-          font-size: 2.5rem;
-          margin-bottom: 0.5rem;
+          font-size: 2.9rem;
+          margin-bottom: 0.7rem;
         }
 
         .member-card h4 {
           color: #22d3ee;
-          margin: 0.5rem 0;
+          margin: 0.6rem 0;
+          font-size: 1.15rem;
         }
 
         .member-info {
@@ -453,23 +430,6 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
         .info-link:hover {
           color: #22d3ee;
           text-decoration: underline;
-        }
-
-        .whatsapp-btn {
-          border: 1px solid rgba(34, 197, 94, 0.4);
-          background: linear-gradient(135deg, rgba(22, 163, 74, 0.4) 0%, rgba(34, 197, 94, 0.25) 100%);
-          color: #dcfce7;
-          border-radius: 7px;
-          padding: 0.45rem 0.6rem;
-          font-size: 0.82rem;
-          font-weight: 700;
-          cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .whatsapp-btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 8px 16px rgba(34, 197, 94, 0.25);
         }
 
         .upload-container {
@@ -632,12 +592,10 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
           }
 
           .members-grid {
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
           }
         }
       `}</style>
     </div>
   );
 }
-
-
