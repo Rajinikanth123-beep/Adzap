@@ -60,7 +60,7 @@ export default function HomePage({ onNavigate }) {
       <section className="hero-section">
         <div className="hero-image-wrap">
           <img
-            src="https://res.cloudinary.com/dllobgxw0/image/upload/v1772024626/Adzap1_fh5d2k.png"
+            src="https://res.cloudinary.com/dllobgxw0/image/upload/v1772166207/3_qwzp2p.jpg"
             alt="ADZAP Event Poster"
             className="hero-image"
             onError={(e) => {
