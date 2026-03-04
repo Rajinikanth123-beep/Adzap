@@ -41,6 +41,18 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
   };
 
   const teamsToDisplay = getTeamsForRound();
+  const getMediaType = (url) => {
+    const value = String(url || '').toLowerCase();
+    if (!value) return 'unknown';
+    if (value.startsWith('data:video/')) return 'video';
+    if (value.startsWith('data:application/pdf')) return 'pdf';
+    if (value.startsWith('data:image/')) return 'image';
+    if (/\.(mp4|mov|webm|m4v|avi)(\?|#|$)/i.test(value)) return 'video';
+    if (/\.pdf(\?|#|$)/i.test(value)) return 'pdf';
+    return 'image';
+  };
+  const selectedTeam = teams.find((t) => t.id === selectedTeamId);
+  const selectedPosterType = getMediaType(selectedTeam?.poster);
   const getParticipantNames = (team) => {
     if (!Array.isArray(team?.members) || team.members.length === 0) return 'No participants added';
     return team.members.map((member) => member?.name || 'Unnamed').join(', ');
@@ -146,18 +158,35 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
         {selectedTeamId && (
           <div className="poster-preview-panel">
             <div className="poster-header">
-              <h3>{teams.find((t) => t.id === selectedTeamId)?.teamName} - Poster</h3>
+              <h3>{selectedTeam?.teamName} - Poster</h3>
               <button className="close-btn" onClick={() => setSelectedTeamId(null)}>
                 X
               </button>
             </div>
-            {teams.find((t) => t.id === selectedTeamId)?.poster ? (
+            {selectedTeam?.poster ? (
               <div className="poster-container">
-                <img src={teams.find((t) => t.id === selectedTeamId)?.poster} alt="Team Poster" className="poster-image" />
+                {selectedPosterType === 'image' && (
+                  <img src={selectedTeam.poster} alt="Team Poster" className="poster-image" />
+                )}
+                {selectedPosterType === 'pdf' && (
+                  <iframe src={selectedTeam.poster} title="Team Poster" className="poster-pdf" />
+                )}
+                {selectedPosterType === 'video' && (
+                  <video src={selectedTeam.poster} controls className="poster-video">
+                    Your browser does not support the video tag.
+                  </video>
+                )}
               </div>
             ) : (
               <div className="no-poster">
                 <p>No poster uploaded yet</p>
+              </div>
+            )}
+            {selectedTeam?.video && (
+              <div className="poster-container" style={{ marginTop: '0.8rem' }}>
+                <video src={selectedTeam.video} controls className="poster-video">
+                  Your browser does not support the video tag.
+                </video>
               </div>
             )}
           </div>
@@ -290,6 +319,8 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
         .close-btn { background: transparent; border: none; color: #22d3ee; font-size: 1.2rem; cursor: pointer; }
         .poster-container { flex: 1; overflow-y: auto; border-radius: 8px; background: rgba(0, 0, 0, 0.3); padding: 1rem; }
         .poster-image { width: 100%; height: auto; border-radius: 6px; }
+        .poster-pdf,
+        .poster-video { width: 100%; min-height: 200px; border: none; border-radius: 6px; background: rgba(0, 0, 0, 0.6); }
         .no-poster { text-align: center; color: #8a92a1; padding: 2rem 1rem; }
         .judge-info {
           background: rgba(34, 211, 238, 0.1);

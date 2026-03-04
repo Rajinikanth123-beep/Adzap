@@ -10,6 +10,17 @@ export default function PresentationPage({ teams, onNavigate }) {
     : teams.filter((t) => t.round1?.selected);
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
+  const getMediaType = (url) => {
+    const value = String(url || '').toLowerCase();
+    if (!value) return 'unknown';
+    if (value.startsWith('data:video/')) return 'video';
+    if (value.startsWith('data:application/pdf')) return 'pdf';
+    if (value.startsWith('data:image/')) return 'image';
+    if (/\.(mp4|mov|webm|m4v|avi)(\?|#|$)/i.test(value)) return 'video';
+    if (/\.pdf(\?|#|$)/i.test(value)) return 'pdf';
+    return 'image';
+  };
+  const posterType = getMediaType(selectedTeam?.poster);
 
   if (selectedTeam && selectedTeam.poster && isPosterPageOpen) {
     return (
@@ -26,11 +37,21 @@ export default function PresentationPage({ teams, onNavigate }) {
         </div>
 
         <div className="poster-page-content">
-          <img
-            src={selectedTeam.poster}
-            alt={`${selectedTeam.teamName} Poster`}
-            className="poster-page-image"
-          />
+          {posterType === 'image' && (
+            <img
+              src={selectedTeam.poster}
+              alt={`${selectedTeam.teamName} Poster`}
+              className="poster-page-image"
+            />
+          )}
+          {posterType === 'pdf' && (
+            <iframe src={selectedTeam.poster} title={`${selectedTeam.teamName} Poster`} className="poster-page-pdf" />
+          )}
+          {posterType === 'video' && (
+            <video src={selectedTeam.poster} controls className="poster-page-video">
+              Your browser does not support the video tag.
+            </video>
+          )}
         </div>
 
         <style>{`
@@ -89,6 +110,15 @@ export default function PresentationPage({ teams, onNavigate }) {
             object-fit: contain;
             border-radius: 8px;
           }
+
+          .poster-page-pdf,
+          .poster-page-video {
+            width: 100%;
+            max-height: calc(100vh - 250px);
+            border: none;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.5);
+          }
         `}</style>
       </div>
     );
@@ -137,7 +167,10 @@ export default function PresentationPage({ teams, onNavigate }) {
               >
                 <div className="team-card-header">
                   <h3>{team.teamName}</h3>
-                  {team.poster && <span className="poster-badge">Poster</span>}
+                  <div className="badge-wrap">
+                    {team.poster && <span className="poster-badge">Poster</span>}
+                    {team.video && <span className="poster-badge">Video</span>}
+                  </div>
                 </div>
 
                 <p className="team-product">{team.productName}</p>
@@ -164,11 +197,21 @@ export default function PresentationPage({ teams, onNavigate }) {
             <div className="poster-content">
               {selectedTeam.poster ? (
                 <div className="poster-box">
-                  <img
-                    src={selectedTeam.poster}
-                    alt={`${selectedTeam.teamName} Poster`}
-                    className="poster-image"
-                  />
+                  {posterType === 'image' && (
+                    <img
+                      src={selectedTeam.poster}
+                      alt={`${selectedTeam.teamName} Poster`}
+                      className="poster-image"
+                    />
+                  )}
+                  {posterType === 'pdf' && (
+                    <iframe src={selectedTeam.poster} title={`${selectedTeam.teamName} Poster`} className="poster-pdf" />
+                  )}
+                  {posterType === 'video' && (
+                    <video src={selectedTeam.poster} controls className="poster-video">
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
                   <button
                     type="button"
                     className="poster-open-btn"
@@ -193,6 +236,17 @@ export default function PresentationPage({ teams, onNavigate }) {
                   <span className="label">Team Size:</span>
                   <span className="value">{selectedTeam.members?.length || 0} members</span>
                 </div>
+              </div>
+
+              <div className="team-details-box">
+                <h3>Demo Video</h3>
+                {selectedTeam.video ? (
+                  <video src={selectedTeam.video} controls className="team-video" />
+                ) : (
+                  <div className="no-poster">
+                    <p>No demo video uploaded</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -303,6 +357,7 @@ export default function PresentationPage({ teams, onNavigate }) {
           align-items: flex-start;
           margin-bottom: 0.75rem;
         }
+        .badge-wrap { display: flex; gap: 0.35rem; }
 
         .team-card-header h3 {
           color: #22d3ee;
@@ -395,6 +450,15 @@ export default function PresentationPage({ teams, onNavigate }) {
           object-fit: contain;
           border-radius: 6px;
           box-shadow: 0 4px 12px rgba(34, 211, 238, 0.2);
+        }
+        .poster-pdf,
+        .poster-video,
+        .team-video {
+          width: 100%;
+          max-height: 220px;
+          border-radius: 6px;
+          border: none;
+          background: rgba(0, 0, 0, 0.6);
         }
 
         .poster-open-btn {
