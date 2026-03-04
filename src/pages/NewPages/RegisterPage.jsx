@@ -21,8 +21,8 @@ export default function RegisterPage({ onRegister, onNavigate }) {
   const handlePosterUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size exceeds 5MB limit');
+      if (file.size > 300 * 1024 * 1024) {
+        alert('File size exceeds 300MB limit');
         return;
       }
       
@@ -244,7 +244,7 @@ export default function RegisterPage({ onRegister, onNavigate }) {
                   <div className="upload-box">
                     <p className="upload-icon">📄</p>
                     <p className="upload-text">Click to upload poster or documentation</p>
-                    <p className="upload-hint">PNG, JPG, or PDF (Max 5MB)</p>
+                    <p className="upload-hint">PNG, JPG, or PDF (Max 300MB)</p>
                   </div>
                 </label>
               )}
