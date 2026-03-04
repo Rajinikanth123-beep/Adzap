@@ -4,7 +4,7 @@ export default function RegisterPage({ onRegister, onNavigate }) {
   const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
   const MAX_DIRECT_SYNC_BYTES = 8 * 1024 * 1024;
   const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dllobgxw0';
-  const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || '';
+  const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'adzap_upload';
   const [formData, setFormData] = useState({
     teamName: '',
     teamNumber: '',
@@ -28,6 +28,7 @@ export default function RegisterPage({ onRegister, onNavigate }) {
     const data = new FormData();
     data.append('file', file);
     data.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    data.append('cloud_name', CLOUDINARY_CLOUD_NAME);
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
       {

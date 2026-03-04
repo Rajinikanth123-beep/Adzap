@@ -10,7 +10,7 @@ export default function ParticipantDashboard({
   const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
   const MAX_DIRECT_SYNC_BYTES = 8 * 1024 * 1024;
   const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dllobgxw0';
-  const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || '';
+  const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'adzap_upload';
   const userTeam = user ? teams.find((t) => t.id === (user.teamId || user.id)) : null;
   const [posterPreview, setPosterPreview] = useState(userTeam?.poster || null);
   const [videoPreview, setVideoPreview] = useState(userTeam?.video || null);
@@ -54,6 +54,7 @@ export default function ParticipantDashboard({
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    formData.append('cloud_name', CLOUDINARY_CLOUD_NAME);
 
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`,
