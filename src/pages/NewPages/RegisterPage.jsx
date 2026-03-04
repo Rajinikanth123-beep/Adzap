@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
 export default function RegisterPage({ onRegister, onNavigate }) {
+  const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
+  const MAX_DIRECT_SYNC_BYTES = 8 * 1024 * 1024;
   const [formData, setFormData] = useState({
     teamName: '',
     teamNumber: '',
@@ -21,8 +23,12 @@ export default function RegisterPage({ onRegister, onNavigate }) {
   const handlePosterUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 300 * 1024 * 1024) {
+      if (file.size > MAX_UPLOAD_SIZE_BYTES) {
         alert('File size exceeds 300MB limit');
+        return;
+      }
+      if (file.size > MAX_DIRECT_SYNC_BYTES) {
+        alert('Upload failed: direct upload currently supports files up to 8MB.');
         return;
       }
       

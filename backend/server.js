@@ -606,6 +606,12 @@ app.post("/api/auth/judge/login", async (req, res, next) => {
 
 app.use((error, _req, res, _next) => {
   console.error(error);
+  if (error?.type === "entity.too.large" || error?.status === 413) {
+    return res.status(413).json({
+      message:
+        "Upload failed: request payload is too large for direct upload. Use files up to 8MB.",
+    });
+  }
   res.status(500).json({ message: "Internal server error" });
 });
 
