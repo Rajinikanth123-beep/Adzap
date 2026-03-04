@@ -44,12 +44,15 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
   const getMediaType = (url) => {
     const value = String(url || '').toLowerCase();
     if (!value) return 'unknown';
+    if (value.includes('/video/upload/')) return 'video';
+    if (value.includes('/raw/upload/')) return 'pdf';
+    if (value.includes('/image/upload/')) return 'image';
     if (value.startsWith('data:video/')) return 'video';
     if (value.startsWith('data:application/pdf')) return 'pdf';
     if (value.startsWith('data:image/')) return 'image';
     if (/\.(mp4|mov|webm|m4v|avi)(\?|#|$)/i.test(value)) return 'video';
     if (/\.pdf(\?|#|$)/i.test(value)) return 'pdf';
-    return 'image';
+    return 'unknown';
   };
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const selectedPosterType = getMediaType(selectedTeam?.poster);
@@ -175,6 +178,11 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
                   <video src={selectedTeam.poster} controls className="poster-video">
                     Your browser does not support the video tag.
                   </video>
+                )}
+                {selectedPosterType === 'unknown' && (
+                  <a href={selectedTeam.poster} target="_blank" rel="noreferrer" className="poster-open-link">
+                    Open Poster File
+                  </a>
                 )}
               </div>
             ) : (
@@ -321,6 +329,15 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
         .poster-image { width: 100%; height: auto; border-radius: 6px; }
         .poster-pdf,
         .poster-video { width: 100%; min-height: 200px; border: none; border-radius: 6px; background: rgba(0, 0, 0, 0.6); }
+        .poster-open-link {
+          display: inline-block;
+          padding: 0.7rem 0.9rem;
+          border: 1px solid rgba(34, 211, 238, 0.6);
+          border-radius: 6px;
+          color: #22d3ee;
+          text-decoration: none;
+          font-weight: 600;
+        }
         .no-poster { text-align: center; color: #8a92a1; padding: 2rem 1rem; }
         .judge-info {
           background: rgba(34, 211, 238, 0.1);

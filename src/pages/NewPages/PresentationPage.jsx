@@ -13,12 +13,15 @@ export default function PresentationPage({ teams, onNavigate }) {
   const getMediaType = (url) => {
     const value = String(url || '').toLowerCase();
     if (!value) return 'unknown';
+    if (value.includes('/video/upload/')) return 'video';
+    if (value.includes('/raw/upload/')) return 'pdf';
+    if (value.includes('/image/upload/')) return 'image';
     if (value.startsWith('data:video/')) return 'video';
     if (value.startsWith('data:application/pdf')) return 'pdf';
     if (value.startsWith('data:image/')) return 'image';
     if (/\.(mp4|mov|webm|m4v|avi)(\?|#|$)/i.test(value)) return 'video';
     if (/\.pdf(\?|#|$)/i.test(value)) return 'pdf';
-    return 'image';
+    return 'unknown';
   };
   const posterType = getMediaType(selectedTeam?.poster);
 
@@ -51,6 +54,11 @@ export default function PresentationPage({ teams, onNavigate }) {
             <video src={selectedTeam.poster} controls className="poster-page-video">
               Your browser does not support the video tag.
             </video>
+          )}
+          {posterType === 'unknown' && (
+            <a href={selectedTeam.poster} target="_blank" rel="noreferrer" className="poster-open-link">
+              Open Poster File
+            </a>
           )}
         </div>
 
@@ -118,6 +126,14 @@ export default function PresentationPage({ teams, onNavigate }) {
             border: none;
             border-radius: 8px;
             background: rgba(0, 0, 0, 0.5);
+          }
+          .poster-open-link {
+            padding: 0.75rem 1rem;
+            border: 1px solid rgba(34, 211, 238, 0.6);
+            border-radius: 6px;
+            color: #22d3ee;
+            text-decoration: none;
+            font-weight: 600;
           }
         `}</style>
       </div>
@@ -211,6 +227,11 @@ export default function PresentationPage({ teams, onNavigate }) {
                     <video src={selectedTeam.poster} controls className="poster-video">
                       Your browser does not support the video tag.
                     </video>
+                  )}
+                  {posterType === 'unknown' && (
+                    <a href={selectedTeam.poster} target="_blank" rel="noreferrer" className="poster-open-link">
+                      Open Poster File
+                    </a>
                   )}
                   <button
                     type="button"
