@@ -113,6 +113,14 @@ export default function ParticipantDashboard({
   const handleVideoUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      const allowedVideoExtensions = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv', 'mpeg', 'mpg'];
+      const fileExtension = String(file.name || '').split('.').pop()?.toLowerCase() || '';
+      const isVideoByMime = String(file.type || '').startsWith('video/');
+      const isAllowedByExtension = allowedVideoExtensions.includes(fileExtension);
+      if (!isVideoByMime && !isAllowedByExtension) {
+        alert('Unsupported video format. Use MP4, MOV, WebM, M4V, AVI, MKV, MPEG, or MPG.');
+        return;
+      }
       if (file.size > MAX_UPLOAD_SIZE_BYTES) {
         alert('File size exceeds 300MB limit');
         return;
@@ -290,7 +298,7 @@ export default function ParticipantDashboard({
                 <label className="upload-label">
                   <input
                     type="file"
-                    accept="video/*"
+                    accept=".mp4,.mov,.webm,.m4v,.avi,.mkv,.mpeg,.mpg,video/*"
                     onChange={handleVideoUpload}
                     style={{ display: 'none' }}
                     disabled={isUploadingVideo}
@@ -300,7 +308,9 @@ export default function ParticipantDashboard({
                     <p className="upload-text">
                       {isUploadingVideo ? 'Uploading video...' : 'Click to upload project demo video'}
                     </p>
-                    <p className="upload-hint">MP4, MOV, WebM, etc. (Max 300MB)</p>
+                    <p className="upload-hint">
+                      MP4, MOV, WebM, M4V, AVI, MKV, MPEG, MPG (Max 300MB)
+                    </p>
                   </div>
                 </label>
               )}
