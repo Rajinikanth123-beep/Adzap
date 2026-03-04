@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-export default function ParticipantDashboard({ user, teams, onNavigate, onUploadPoster }) {
+export default function ParticipantDashboard({
+  user,
+  teams,
+  onNavigate,
+  onUploadPoster,
+  onUploadVideo,
+}) {
   const userTeam = user ? teams.find((t) => t.id === (user.teamId || user.id)) : null;
   const [posterPreview, setPosterPreview] = useState(userTeam?.poster || null);
+  const [videoPreview, setVideoPreview] = useState(userTeam?.video || null);
   const icons = {
     check: '\u2713',
     arrow: '\u2192',
@@ -13,6 +20,11 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
     tip: '\u{1F4A1}',
     back: '\u2190',
   };
+
+  useEffect(() => {
+    setPosterPreview(userTeam?.poster || null);
+    setVideoPreview(userTeam?.video || null);
+  }, [userTeam?.poster, userTeam?.video]);
 
   if (!userTeam) {
     return (
@@ -34,8 +46,8 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
   const handlePosterUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size exceeds 5MB limit');
+      if (file.size > 200 * 1024 * 1024) {
+        alert('File size exceeds 200MB limit');
         return;
       }
 
@@ -45,6 +57,26 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
         setPosterPreview(posterData);
         if (onUploadPoster) {
           onUploadPoster(userTeam.id, posterData);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleVideoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 200 * 1024 * 1024) {
+        alert('File size exceeds 200MB limit');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const videoData = event.target.result;
+        setVideoPreview(videoData);
+        if (onUploadVideo) {
+          onUploadVideo(userTeam.id, videoData);
         }
       };
       reader.readAsDataURL(file);
@@ -128,45 +160,88 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
       </div>
 
       {round1Selected && (
-        <div className="poster-section">
-          <h3>Project Poster / Documentation</h3>
-          <div className="upload-container">
-            {posterPreview ? (
-              <div className="poster-preview">
-                <img src={posterPreview} alt="Poster Preview" />
-                <button
-                  className="upload-btn remove"
-                  onClick={() => {
-                    setPosterPreview(null);
-                    if (onUploadPoster) {
-                      onUploadPoster(userTeam.id, null);
-                    }
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <label className="upload-label">
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handlePosterUpload}
-                  style={{ display: 'none' }}
-                />
-                <div className="upload-box">
-                  <p className="upload-icon">{icons.file}</p>
-                  <p className="upload-text">Click to upload poster or documentation</p>
-                  <p className="upload-hint">PNG, JPG, or PDF (Max 5MB)</p>
+        <>
+          <div className="poster-section">
+            <h3>Project Poster / Documentation</h3>
+            <div className="upload-container">
+              {posterPreview ? (
+                <div className="poster-preview">
+                  <img src={posterPreview} alt="Poster Preview" />
+                  <button
+                    className="upload-btn remove"
+                    onClick={() => {
+                      setPosterPreview(null);
+                      if (onUploadPoster) {
+                        onUploadPoster(userTeam.id, null);
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
                 </div>
-              </label>
-            )}
+              ) : (
+                <label className="upload-label">
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handlePosterUpload}
+                    style={{ display: 'none' }}
+                  />
+                  <div className="upload-box">
+                    <p className="upload-icon">{icons.file}</p>
+                    <p className="upload-text">Click to upload poster or documentation</p>
+                    <p className="upload-hint">PNG, JPG, or PDF (Max 200MB)</p>
+                  </div>
+                </label>
+              )}
+            </div>
+            <p className="upload-note">
+              {icons.tip} Upload your project poster or documentation for judges' reference during
+              Round 2.
+            </p>
           </div>
+
+          <div className="poster-section">
+            <h3>Project Demo Video</h3>
+            <div className="upload-container">
+              {videoPreview ? (
+                <div className="video-preview">
+                  <video src={videoPreview} controls className="video-element">
+                    Your browser does not support the video tag.
+                  </video>
+                  <button
+                    className="upload-btn remove"
+                    onClick={() => {
+                      setVideoPreview(null);
+                      if (onUploadVideo) {
+                        onUploadVideo(userTeam.id, null);
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <label className="upload-label">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoUpload}
+                    style={{ display: 'none' }}
+                  />
+                  <div className="upload-box">
+                    <p className="upload-icon">{icons.file}</p>
+                    <p className="upload-text">Click to upload project demo video</p>
+                    <p className="upload-hint">MP4, MOV, WebM, etc. (Max 200MB)</p>
+                  </div>
+                </label>
+              )}
+            </div>
           <p className="upload-note">
-            {icons.tip} Upload your project poster or documentation for judges' reference during
-            Round 2.
+            {icons.tip} Upload your demo video so judges can review your product walkthrough.
           </p>
-        </div>
+          </div>
+        </>
       )}
 
       <div className="quick-links">
@@ -483,6 +558,21 @@ export default function ParticipantDashboard({ user, teams, onNavigate, onUpload
           width: 100%;
           border-radius: 8px;
           border: 2px solid rgba(34, 211, 238, 0.3);
+        }
+
+        .video-preview {
+          position: relative;
+          display: inline-block;
+          width: 100%;
+          max-width: 500px;
+          text-align: center;
+        }
+
+        .video-element {
+          width: 100%;
+          border-radius: 8px;
+          border: 2px solid rgba(34, 211, 238, 0.3);
+          background: rgba(0, 0, 0, 0.45);
         }
 
         .upload-btn {

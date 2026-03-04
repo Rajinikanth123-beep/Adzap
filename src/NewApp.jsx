@@ -201,9 +201,16 @@ export default function NewApp() {
 
     if (teams.length > 0) {
       const teamsWithoutPosterData = teams.map(team => {
-        if (!team.poster || typeof team.poster !== 'string') return team;
-        if (!team.poster.startsWith('data:')) return team;
-        const { poster, ...rest } = team;
+        const shouldDropPoster = team.poster && typeof team.poster === 'string' && team.poster.startsWith('data:');
+        const shouldDropVideo = team.video && typeof team.video === 'string' && team.video.startsWith('data:');
+        if (!shouldDropPoster && !shouldDropVideo) return team;
+        const { poster, video, ...rest } = team;
+        if (!shouldDropPoster) {
+          rest.poster = poster;
+        }
+        if (!shouldDropVideo) {
+          rest.video = video;
+        }
         return rest;
       });
 
@@ -710,6 +717,16 @@ export default function NewApp() {
     await persistTeams(updated);
   };
 
+  const uploadTeamVideo = async (teamId, videoData) => {
+    const updated = teams.map(team => {
+      if (team.id === teamId) {
+        return { ...team, video: videoData };
+      }
+      return team;
+    });
+    await persistTeams(updated);
+  };
+
   const updateTeamProductName = async (teamId, productName) => {
     const updated = teams.map(team => {
       if (team.id === teamId) {
@@ -977,6 +994,7 @@ export default function NewApp() {
             teams={teams}
             onNavigate={setCurrentPage}
             onUploadPoster={uploadTeamPoster}
+            onUploadVideo={uploadTeamVideo}
           />
         ) : (
           <ParticipantLoginPage onLogin={handleParticipantLogin} onNavigate={setCurrentPage} />
