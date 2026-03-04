@@ -46,8 +46,8 @@ export default function ParticipantDashboard({
   const handlePosterUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 200 * 1024 * 1024) {
-        alert('File size exceeds 200MB limit');
+      if (file.size > 300 * 1024 * 1024) {
+        alert('File size exceeds 300MB limit');
         return;
       }
 
@@ -66,8 +66,8 @@ export default function ParticipantDashboard({
   const handleVideoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 200 * 1024 * 1024) {
-        alert('File size exceeds 200MB limit');
+      if (file.size > 300 * 1024 * 1024) {
+        alert('File size exceeds 300MB limit');
         return;
       }
 
@@ -190,7 +190,7 @@ export default function ParticipantDashboard({
                   <div className="upload-box">
                     <p className="upload-icon">{icons.file}</p>
                     <p className="upload-text">Click to upload poster or documentation</p>
-                    <p className="upload-hint">PNG, JPG, or PDF (Max 200MB)</p>
+                    <p className="upload-hint">PNG, JPG, or PDF (Max 300MB)</p>
                   </div>
                 </label>
               )}
@@ -232,7 +232,7 @@ export default function ParticipantDashboard({
                   <div className="upload-box">
                     <p className="upload-icon">{icons.file}</p>
                     <p className="upload-text">Click to upload project demo video</p>
-                    <p className="upload-hint">MP4, MOV, WebM, etc. (Max 200MB)</p>
+                    <p className="upload-hint">MP4, MOV, WebM, etc. (Max 300MB)</p>
                   </div>
                 </label>
               )}
