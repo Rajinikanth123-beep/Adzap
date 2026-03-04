@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 export default function RegisterPage({ onRegister, onNavigate }) {
   const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
   const MAX_DIRECT_SYNC_BYTES = 8 * 1024 * 1024;
+  const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dllobgxw0';
+  const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || '';
   const [formData, setFormData] = useState({
     teamName: '',
     teamNumber: '',
@@ -14,31 +16,68 @@ export default function RegisterPage({ onRegister, onNavigate }) {
   });
   const [posterPreview, setPosterPreview] = useState(null);
   const [submitError, setSubmitError] = useState('');
+  const [isUploadingPoster, setIsUploadingPoster] = useState(false);
+  const canUseCloudinary = Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handlePosterUpload = (e) => {
+  const uploadToCloudinary = async (file) => {
+    const data = new FormData();
+    data.append('file', file);
+    data.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,
+      {
+        method: 'POST',
+        body: data,
+      }
+    );
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result?.error?.message || 'Cloud upload failed');
+    }
+    return result.secure_url || result.url;
+  };
+
+  const toDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => resolve(event.target.result);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+
+  const handlePosterUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > MAX_UPLOAD_SIZE_BYTES) {
         alert('File size exceeds 300MB limit');
         return;
       }
-      if (file.size > MAX_DIRECT_SYNC_BYTES) {
-        alert('Upload failed: direct upload currently supports files up to 8MB.');
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const posterData = event.target.result;
+      setIsUploadingPoster(true);
+      try {
+        let posterData;
+        if (canUseCloudinary) {
+          posterData = await uploadToCloudinary(file);
+        } else {
+          if (file.size > MAX_DIRECT_SYNC_BYTES) {
+            alert(
+              'Large uploads need Cloudinary config. Set REACT_APP_CLOUDINARY_UPLOAD_PRESET in Vercel.'
+            );
+            return;
+          }
+          posterData = await toDataUrl(file);
+        }
         setPosterPreview(posterData);
         setFormData(prev => ({ ...prev, poster: posterData }));
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        alert(error?.message || 'Poster upload failed');
+      } finally {
+        setIsUploadingPoster(false);
+      }
     }
   };
 
@@ -246,10 +285,11 @@ export default function RegisterPage({ onRegister, onNavigate }) {
                     accept="image/*,.pdf"
                     onChange={handlePosterUpload}
                     style={{ display: 'none' }}
+                    disabled={isUploadingPoster}
                   />
                   <div className="upload-box">
                     <p className="upload-icon">📄</p>
-                    <p className="upload-text">Click to upload poster or documentation</p>
+                    <p className="upload-text">{isUploadingPoster ? 'Uploading poster...' : 'Click to upload poster or documentation'}</p>
                     <p className="upload-hint">PNG, JPG, or PDF (Max 300MB)</p>
                   </div>
                 </label>
@@ -545,3 +585,4 @@ export default function RegisterPage({ onRegister, onNavigate }) {
     </div>
   );
 }
+

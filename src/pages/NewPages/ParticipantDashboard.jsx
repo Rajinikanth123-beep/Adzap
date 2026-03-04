@@ -9,9 +9,14 @@ export default function ParticipantDashboard({
 }) {
   const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
   const MAX_DIRECT_SYNC_BYTES = 8 * 1024 * 1024;
+  const CLOUDINARY_CLOUD_NAME = process.env.REACT_APP_CLOUDINARY_CLOUD_NAME || 'dllobgxw0';
+  const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || '';
   const userTeam = user ? teams.find((t) => t.id === (user.teamId || user.id)) : null;
   const [posterPreview, setPosterPreview] = useState(userTeam?.poster || null);
   const [videoPreview, setVideoPreview] = useState(userTeam?.video || null);
+  const [isUploadingPoster, setIsUploadingPoster] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const canUseCloudinary = Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET);
   const icons = {
     check: '\u2713',
     arrow: '\u2192',
@@ -45,51 +50,96 @@ export default function ParticipantDashboard({
   const round1Selected = userTeam.round1?.selected || false;
   const round2Selection = userTeam.round2?.selected || false;
 
-  const handlePosterUpload = (e) => {
+  const uploadToCloudinary = async (file, resourceType = 'auto') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${resourceType}/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data?.error?.message || 'Cloud upload failed');
+    }
+    return data.secure_url || data.url;
+  };
+
+  const toDataUrl = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => resolve(event.target.result);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+
+  const handlePosterUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > MAX_UPLOAD_SIZE_BYTES) {
         alert('File size exceeds 300MB limit');
         return;
       }
-      if (file.size > MAX_DIRECT_SYNC_BYTES) {
-        alert('Upload failed: direct upload currently supports files up to 8MB.');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const posterData = event.target.result;
+      setIsUploadingPoster(true);
+      try {
+        let posterData;
+        if (canUseCloudinary) {
+          posterData = await uploadToCloudinary(file, 'auto');
+        } else {
+          if (file.size > MAX_DIRECT_SYNC_BYTES) {
+            alert(
+              'Large uploads need Cloudinary config. Set REACT_APP_CLOUDINARY_UPLOAD_PRESET in Vercel.'
+            );
+            return;
+          }
+          posterData = await toDataUrl(file);
+        }
         setPosterPreview(posterData);
         if (onUploadPoster) {
-          onUploadPoster(userTeam.id, posterData);
+          await Promise.resolve(onUploadPoster(userTeam.id, posterData));
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        alert(error?.message || 'Poster upload failed');
+      } finally {
+        setIsUploadingPoster(false);
+      }
     }
   };
 
-  const handleVideoUpload = (e) => {
+  const handleVideoUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
       if (file.size > MAX_UPLOAD_SIZE_BYTES) {
         alert('File size exceeds 300MB limit');
         return;
       }
-      if (file.size > MAX_DIRECT_SYNC_BYTES) {
-        alert('Upload failed: direct upload currently supports files up to 8MB.');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const videoData = event.target.result;
+      setIsUploadingVideo(true);
+      try {
+        let videoData;
+        if (canUseCloudinary) {
+          videoData = await uploadToCloudinary(file, 'video');
+        } else {
+          if (file.size > MAX_DIRECT_SYNC_BYTES) {
+            alert(
+              'Large uploads need Cloudinary config. Set REACT_APP_CLOUDINARY_UPLOAD_PRESET in Vercel.'
+            );
+            return;
+          }
+          videoData = await toDataUrl(file);
+        }
         setVideoPreview(videoData);
         if (onUploadVideo) {
-          onUploadVideo(userTeam.id, videoData);
+          await Promise.resolve(onUploadVideo(userTeam.id, videoData));
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        alert(error?.message || 'Video upload failed');
+      } finally {
+        setIsUploadingVideo(false);
+      }
     }
   };
 
@@ -196,10 +246,15 @@ export default function ParticipantDashboard({
                     accept="image/*,.pdf"
                     onChange={handlePosterUpload}
                     style={{ display: 'none' }}
+                    disabled={isUploadingPoster}
                   />
                   <div className="upload-box">
                     <p className="upload-icon">{icons.file}</p>
-                    <p className="upload-text">Click to upload poster or documentation</p>
+                    <p className="upload-text">
+                      {isUploadingPoster
+                        ? 'Uploading poster...'
+                        : 'Click to upload poster or documentation'}
+                    </p>
                     <p className="upload-hint">PNG, JPG, or PDF (Max 300MB)</p>
                   </div>
                 </label>
@@ -238,10 +293,13 @@ export default function ParticipantDashboard({
                     accept="video/*"
                     onChange={handleVideoUpload}
                     style={{ display: 'none' }}
+                    disabled={isUploadingVideo}
                   />
                   <div className="upload-box">
                     <p className="upload-icon">{icons.file}</p>
-                    <p className="upload-text">Click to upload project demo video</p>
+                    <p className="upload-text">
+                      {isUploadingVideo ? 'Uploading video...' : 'Click to upload project demo video'}
+                    </p>
                     <p className="upload-hint">MP4, MOV, WebM, etc. (Max 300MB)</p>
                   </div>
                 </label>
