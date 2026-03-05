@@ -5,7 +5,6 @@ export default function ParticipantDashboard({
   teams,
   onNavigate,
   onUploadPoster,
-  onUploadVideo,
 }) {
   const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
   const MAX_DIRECT_SYNC_BYTES = 8 * 1024 * 1024;
@@ -13,9 +12,7 @@ export default function ParticipantDashboard({
   const CLOUDINARY_UPLOAD_PRESET = process.env.REACT_APP_CLOUDINARY_UPLOAD_PRESET || 'adzap_upload';
   const userTeam = user ? teams.find((t) => t.id === (user.teamId || user.id)) : null;
   const [posterPreview, setPosterPreview] = useState(userTeam?.poster || null);
-  const [videoPreview, setVideoPreview] = useState(userTeam?.video || null);
   const [isUploadingPoster, setIsUploadingPoster] = useState(false);
-  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const canUseCloudinary = Boolean(CLOUDINARY_CLOUD_NAME && CLOUDINARY_UPLOAD_PRESET);
   const icons = {
     check: '\u2713',
@@ -27,11 +24,24 @@ export default function ParticipantDashboard({
     tip: '\u{1F4A1}',
     back: '\u2190',
   };
+  const getMediaType = (url) => {
+    const value = String(url || '').toLowerCase();
+    if (!value) return 'unknown';
+    if (value.includes('/video/upload/')) return 'video';
+    if (value.includes('/raw/upload/')) return 'pdf';
+    if (value.includes('/image/upload/')) return 'image';
+    if (value.startsWith('data:video/')) return 'video';
+    if (value.startsWith('data:application/pdf')) return 'pdf';
+    if (value.startsWith('data:image/')) return 'image';
+    if (/\.(mp4|mov|webm|m4v|avi|mkv|mpeg|mpg)(\?|#|$)/i.test(value)) return 'video';
+    if (/\.pdf(\?|#|$)/i.test(value)) return 'pdf';
+    if (/\.(png|jpe?g|gif|webp|svg)(\?|#|$)/i.test(value)) return 'image';
+    return 'unknown';
+  };
 
   useEffect(() => {
     setPosterPreview(userTeam?.poster || null);
-    setVideoPreview(userTeam?.video || null);
-  }, [userTeam?.poster, userTeam?.video]);
+  }, [userTeam?.poster]);
 
   if (!userTeam) {
     return (
@@ -106,47 +116,6 @@ export default function ParticipantDashboard({
         alert(error?.message || 'Poster upload failed');
       } finally {
         setIsUploadingPoster(false);
-      }
-    }
-  };
-
-  const handleVideoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const allowedVideoExtensions = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv', 'mpeg', 'mpg'];
-      const fileExtension = String(file.name || '').split('.').pop()?.toLowerCase() || '';
-      const isVideoByMime = String(file.type || '').startsWith('video/');
-      const isAllowedByExtension = allowedVideoExtensions.includes(fileExtension);
-      if (!isVideoByMime && !isAllowedByExtension) {
-        alert('Unsupported video format. Use MP4, MOV, WebM, M4V, AVI, MKV, MPEG, or MPG.');
-        return;
-      }
-      if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-        alert('File size exceeds 300MB limit');
-        return;
-      }
-      setIsUploadingVideo(true);
-      try {
-        let videoData;
-        if (canUseCloudinary) {
-          videoData = await uploadToCloudinary(file, 'video');
-        } else {
-          if (file.size > MAX_DIRECT_SYNC_BYTES) {
-            alert(
-              'Large uploads need Cloudinary config. Set REACT_APP_CLOUDINARY_UPLOAD_PRESET in Vercel.'
-            );
-            return;
-          }
-          videoData = await toDataUrl(file);
-        }
-        setVideoPreview(videoData);
-        if (onUploadVideo) {
-          await Promise.resolve(onUploadVideo(userTeam.id, videoData));
-        }
-      } catch (error) {
-        alert(error?.message || 'Video upload failed');
-      } finally {
-        setIsUploadingVideo(false);
       }
     }
   };
@@ -227,14 +196,29 @@ export default function ParticipantDashboard({
         </div>
       </div>
 
-      {round1Selected && (
+      {(round1Selected || round2Selection) && (
         <>
           <div className="poster-section">
             <h3>Project Poster / Documentation</h3>
             <div className="upload-container">
               {posterPreview ? (
                 <div className="poster-preview">
-                  <img src={posterPreview} alt="Poster Preview" />
+                  {getMediaType(posterPreview) === 'image' && (
+                    <img src={posterPreview} alt="Poster Preview" />
+                  )}
+                  {getMediaType(posterPreview) === 'pdf' && (
+                    <iframe src={posterPreview} title="Poster PDF Preview" className="video-element" />
+                  )}
+                  {getMediaType(posterPreview) === 'video' && (
+                    <video src={posterPreview} controls className="video-element">
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                  {getMediaType(posterPreview) === 'unknown' && (
+                    <a href={posterPreview} target="_blank" rel="noreferrer" className="info-link">
+                      Open uploaded file
+                    </a>
+                  )}
                   <button
                     className="upload-btn remove"
                     onClick={() => {
@@ -251,7 +235,7 @@ export default function ParticipantDashboard({
                 <label className="upload-label">
                   <input
                     type="file"
-                    accept="image/*,.pdf"
+                    accept="image/*,.pdf,video/*,.mp4,.mov,.webm,.m4v,.avi,.mkv,.mpeg,.mpg"
                     onChange={handlePosterUpload}
                     style={{ display: 'none' }}
                     disabled={isUploadingPoster}
@@ -260,10 +244,10 @@ export default function ParticipantDashboard({
                     <p className="upload-icon">{icons.file}</p>
                     <p className="upload-text">
                       {isUploadingPoster
-                        ? 'Uploading poster...'
-                        : 'Click to upload poster or documentation'}
+                        ? 'Uploading file...'
+                        : 'Click to upload poster/documentation/video'}
                     </p>
-                    <p className="upload-hint">PNG, JPG, or PDF (Max 300MB)</p>
+                    <p className="upload-hint">Image, PDF, or Video (Max 300MB)</p>
                   </div>
                 </label>
               )}
@@ -274,51 +258,6 @@ export default function ParticipantDashboard({
             </p>
           </div>
 
-          <div className="poster-section">
-            <h3>Project Demo Video</h3>
-            <div className="upload-container">
-              {videoPreview ? (
-                <div className="video-preview">
-                  <video src={videoPreview} controls className="video-element">
-                    Your browser does not support the video tag.
-                  </video>
-                  <button
-                    className="upload-btn remove"
-                    onClick={() => {
-                      setVideoPreview(null);
-                      if (onUploadVideo) {
-                        onUploadVideo(userTeam.id, null);
-                      }
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ) : (
-                <label className="upload-label">
-                  <input
-                    type="file"
-                    accept=".mp4,.mov,.webm,.m4v,.avi,.mkv,.mpeg,.mpg,video/*"
-                    onChange={handleVideoUpload}
-                    style={{ display: 'none' }}
-                    disabled={isUploadingVideo}
-                  />
-                  <div className="upload-box">
-                    <p className="upload-icon">{icons.file}</p>
-                    <p className="upload-text">
-                      {isUploadingVideo ? 'Uploading video...' : 'Click to upload project demo video'}
-                    </p>
-                    <p className="upload-hint">
-                      MP4, MOV, WebM, M4V, AVI, MKV, MPEG, MPG (Max 300MB)
-                    </p>
-                  </div>
-                </label>
-              )}
-            </div>
-          <p className="upload-note">
-            {icons.tip} Upload your demo video so judges can review your product walkthrough.
-          </p>
-          </div>
         </>
       )}
 

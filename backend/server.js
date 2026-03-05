@@ -353,22 +353,50 @@ app.put("/api/teams", async (req, res, next) => {
       return res.status(400).json({ message: "teams must be an array" });
     }
 
-    const normalizedTeams = teams.map((team) => ({
-      ...sanitizeDoc(team),
-      id: Number(team.id) || nextId(),
-      teamName: String(team.teamName || "").trim(),
-      teamNumber: String(team.teamNumber || "").trim(),
-      email: String(team.email || "").trim(),
-      emailKey: normalizeEmail(team.email),
-      password: String(team.password || ""),
-      members: mapMembers(team.members),
-      productName: String(team.productName || "").trim(),
-      poster: team.poster || null,
-      round1: team.round1 || { avgScore: 0, selected: false },
-      round2: team.round2 || { avgScore: 0, selected: false },
-      scores: team.scores || {},
-      createdAt: team.createdAt || new Date().toISOString(),
-    }));
+    let existingTeams = [];
+    if (USE_MONGO) {
+      existingTeams = await TeamModel.find({}).lean();
+    } else {
+      const store = await readStore();
+      existingTeams = Array.isArray(store.teams) ? store.teams : [];
+    }
+
+    const existingById = new Map(
+      existingTeams.map((team) => [Number(team.id), team]).filter(([id]) => Number.isFinite(id))
+    );
+    const existingByEmailKey = new Map(
+      existingTeams
+        .map((team) => [normalizeEmail(team.email), team])
+        .filter(([emailKey]) => Boolean(emailKey))
+    );
+
+    const normalizedTeams = teams.map((team) => {
+      const normalizedId = Number(team.id) || nextId();
+      const normalizedEmail = String(team.email || "").trim();
+      const normalizedEmailKey = normalizeEmail(normalizedEmail);
+      const existingTeam =
+        existingById.get(normalizedId) || existingByEmailKey.get(normalizedEmailKey) || null;
+      const incomingPassword = String(team.password || "");
+      const preservedPassword = incomingPassword || String(existingTeam?.password || "");
+
+      return {
+        ...sanitizeDoc(team),
+        id: normalizedId,
+        teamName: String(team.teamName || "").trim(),
+        teamNumber: String(team.teamNumber || "").trim(),
+        email: normalizedEmail,
+        emailKey: normalizedEmailKey,
+        // Preserve existing participant password when frontend sends sanitized team data.
+        password: preservedPassword,
+        members: mapMembers(team.members),
+        productName: String(team.productName || "").trim(),
+        poster: team.poster || null,
+        round1: team.round1 || { avgScore: 0, selected: false },
+        round2: team.round2 || { avgScore: 0, selected: false },
+        scores: team.scores || {},
+        createdAt: team.createdAt || existingTeam?.createdAt || new Date().toISOString(),
+      };
+    });
 
     if (USE_MONGO) {
       await TeamModel.deleteMany({});
@@ -396,11 +424,25 @@ app.post("/api/auth/participant/login", async (req, res, next) => {
     let team;
     if (USE_MONGO) {
       team = await TeamModel.findOne({ emailKey, password: passwordKey }).lean();
+      if (!team) {
+        const teamByEmail = await TeamModel.findOne({ emailKey }).lean();
+        // Compatibility fallback: allow login if legacy data has blank password.
+        if (teamByEmail && !String(teamByEmail.password || "").trim()) {
+          team = teamByEmail;
+        }
+      }
     } else {
       const store = await readStore();
       team = store.teams.find(
         (t) => normalizeEmail(t.email) === emailKey && String(t.password) === passwordKey
       );
+      if (!team) {
+        const teamByEmail = store.teams.find((t) => normalizeEmail(t.email) === emailKey);
+        // Compatibility fallback: allow login if legacy data has blank password.
+        if (teamByEmail && !String(teamByEmail.password || "").trim()) {
+          team = teamByEmail;
+        }
+      }
     }
 
     if (!team) {

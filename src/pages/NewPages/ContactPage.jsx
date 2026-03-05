@@ -224,11 +224,11 @@ export default function ContactPage({ onNavigate, onSubmitMessage }) {
           </div>
           <div className="faq-item">
             <h4>What is the team size?</h4>
-            <p>Each team should have exactly 5 members. This is a requirement for participation in ADZAP Arena.</p>
+            <p>Each team should have exactly 2 members. This is a requirement for participation in ADZAP Arena.</p>
           </div>
           <div className="faq-item">
             <h4>How is the scoring done?</h4>
-            <p>Teams are scored by 2 independent judges in each round. The final score is the average of both judges' scores (0-10 scale).</p>
+            <p>Teams are scored by 2 independent judges using five criteria (10 marks each). Team totals are calculated out of 100.</p>
           </div>
           <div className="faq-item">
             <h4>What happens after Round 1?</h4>

@@ -1,14 +1,23 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
+const SCORE_CRITERIA = [
+  { key: 'creativityAndDesign', label: 'Creativity and Design' },
+  { key: 'technicalKnowledge', label: 'Technical Knowledge' },
+  { key: 'clarityOfConcept', label: 'Clarity of Concept' },
+  { key: 'visualPresentation', label: 'Visual Presentation' },
+  { key: 'explanationAndInteraction', label: 'Explanation and Interaction' },
+];
 
 export default function JudgeDashboard({ user, teams, onUpdateScores, onClearScores, onNavigate }) {
   const [currentRound, setCurrentRound] = useState(1);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [posterPreviewFailed, setPosterPreviewFailed] = useState(false);
 
   const currentJudge = (() => {
+    if (user?.judgeId === 'judge1' || user?.judgeId === 'judge2') return user.judgeId;
     const email = String(user?.email || '').trim().toLowerCase();
     if (email.includes('judge1')) return 'judge1';
     if (email.includes('judge2')) return 'judge2';
-    if (email) return email;
     return 'judge1';
   })();
 
@@ -17,30 +26,100 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
     return teams.filter((t) => t.round1?.selected);
   };
 
-  const handleScoreChange = (teamId, score) => {
-    onUpdateScores(teamId, currentJudge, {
-      round: currentRound,
-      score: Math.min(10, Math.max(0, score)),
-    });
-  };
-
-  const getTeamScore = (team) => {
-    if (!team.scores) return '-';
-    const judgeScores = team.scores[currentJudge];
-    if (!judgeScores) return '-';
+  const getRoundEntry = (team) => {
+    if (!team?.scores) return null;
+    const emailKey = String(user?.email || '').trim().toLowerCase();
+    const judgeScores = team.scores[currentJudge] || (emailKey ? team.scores[emailKey] : null);
+    if (!judgeScores) return null;
 
     const roundKey = currentRound === 1 ? 'round1' : 'round2';
-    const roundScore = judgeScores[roundKey];
-    if (roundScore !== undefined && roundScore !== null) return roundScore;
+    if (judgeScores[roundKey] !== undefined && judgeScores[roundKey] !== null) {
+      return judgeScores[roundKey];
+    }
 
     if (judgeScores.round === currentRound && judgeScores.score !== undefined && judgeScores.score !== null) {
       return judgeScores.score;
     }
 
+    return null;
+  };
+
+  const toCriteriaScores = (entry) => {
+    const base = SCORE_CRITERIA.reduce((acc, item) => ({ ...acc, [item.key]: 0 }), {});
+    if (!entry || typeof entry !== 'object') return base;
+    const source = entry.criteriaScores && typeof entry.criteriaScores === 'object' ? entry.criteriaScores : entry;
+    return SCORE_CRITERIA.reduce((acc, item) => {
+      const raw = Number(source[item.key]);
+      const safe = Number.isFinite(raw) ? Math.min(10, Math.max(0, raw)) : 0;
+      acc[item.key] = safe;
+      return acc;
+    }, { ...base });
+  };
+
+  const getTotalFromEntry = (entry) => {
+    if (entry === null || entry === undefined) return '-';
+    if (typeof entry === 'number') return Number.isFinite(entry) ? entry : '-';
+    if (typeof entry === 'object') {
+      if (entry.total !== undefined && entry.total !== null) {
+        const total = Number(entry.total);
+        if (Number.isFinite(total)) return total;
+      }
+      const criteria = toCriteriaScores(entry);
+      return SCORE_CRITERIA.reduce((sum, item) => sum + Number(criteria[item.key] || 0), 0);
+    }
     return '-';
   };
 
+  const handleScoreChange = (teamId, criterionKey, rawScore) => {
+    const parsed = Number(rawScore);
+    const safeScore = Number.isFinite(parsed) ? Math.min(10, Math.max(0, parsed)) : 0;
+    const team = teams.find((t) => t.id === teamId);
+    const existing = toCriteriaScores(getRoundEntry(team));
+    const criteriaScores = {
+      ...existing,
+      [criterionKey]: safeScore,
+    };
+    const total = SCORE_CRITERIA.reduce((sum, item) => sum + Number(criteriaScores[item.key] || 0), 0);
+
+    onUpdateScores(teamId, currentJudge, {
+      round: currentRound,
+      criteriaScores,
+      total,
+    });
+  };
+
+  const getTeamCriteriaScore = (team, criterionKey) => {
+    const entry = getRoundEntry(team);
+    if (!entry || typeof entry !== 'object') return '';
+    const criteria = toCriteriaScores(entry);
+    return criteria[criterionKey] ?? '';
+  };
+
+  const getTeamTotalScore = (team) => getTotalFromEntry(getRoundEntry(team));
+
   const teamsToDisplay = getTeamsForRound();
+  const resolveMediaUrl = (media) => {
+    if (!media) return '';
+    if (typeof media === 'string') return media.trim();
+    if (typeof media === 'object') {
+      if (typeof media.secure_url === 'string') return media.secure_url;
+      if (typeof media.url === 'string') return media.url;
+      if (typeof media.asset_url === 'string') return media.asset_url;
+      if (typeof media.display_url === 'string') return media.display_url;
+      if (typeof media.src === 'string') return media.src;
+      if (typeof media.poster === 'string') return media.poster;
+      if (typeof media.video === 'string') return media.video;
+      if (typeof media.value === 'string') return media.value;
+
+      // Fallback for nested payloads from older saves/API responses.
+      for (const value of Object.values(media)) {
+        const nested = resolveMediaUrl(value);
+        if (nested) return nested;
+      }
+    }
+    return '';
+  };
+
   const getMediaType = (url) => {
     const value = String(url || '').toLowerCase();
     if (!value) return 'unknown';
@@ -54,8 +133,55 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
     if (/\.pdf(\?|#|$)/i.test(value)) return 'pdf';
     return 'unknown';
   };
-  const selectedTeam = teams.find((t) => t.id === selectedTeamId);
-  const selectedPosterType = getMediaType(selectedTeam?.poster);
+  const isLikelyMediaUrl = (value) => {
+    const url = String(value || '').trim().toLowerCase();
+    if (!url) return false;
+    if (url.startsWith('data:image/') || url.startsWith('data:video/') || url.startsWith('data:application/pdf')) return true;
+    if (url.includes('/image/upload/') || url.includes('/video/upload/') || url.includes('/raw/upload/')) return true;
+    if (/\.(png|jpe?g|gif|webp|svg|pdf|mp4|mov|webm|m4v|avi|mkv|mpeg|mpg)(\?|#|$)/i.test(url)) return true;
+    return false;
+  };
+  const findMediaUrlDeep = (obj, depth = 0) => {
+    if (!obj || depth > 4) return '';
+    if (typeof obj === 'string') return isLikelyMediaUrl(obj) ? obj : '';
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        const found = findMediaUrlDeep(item, depth + 1);
+        if (found) return found;
+      }
+      return '';
+    }
+    if (typeof obj === 'object') {
+      for (const value of Object.values(obj)) {
+        const found = findMediaUrlDeep(value, depth + 1);
+        if (found) return found;
+      }
+    }
+    return '';
+  };
+  const resolveTeamPosterUrl = (team) => {
+    if (!team) return '';
+    return (
+      resolveMediaUrl(team.poster) ||
+      resolveMediaUrl(team.posterUrl) ||
+      resolveMediaUrl(team.posterURL) ||
+      resolveMediaUrl(team.documentUrl) ||
+      resolveMediaUrl(team.documentationUrl) ||
+      resolveMediaUrl(team.fileUrl) ||
+      resolveMediaUrl(team.uploadUrl) ||
+      resolveMediaUrl(team.round1?.poster) ||
+      resolveMediaUrl(team.round2?.poster) ||
+      findMediaUrlDeep(team) ||
+      ''
+    );
+  };
+  const selectedTeam = teams.find((t) => String(t.id) === String(selectedTeamId));
+  const selectedPosterUrl = resolveTeamPosterUrl(selectedTeam);
+  const selectedPosterType = getMediaType(selectedPosterUrl);
+  const selectedVideoUrl = resolveMediaUrl(selectedTeam?.video);
+  useEffect(() => {
+    setPosterPreviewFailed(false);
+  }, [selectedPosterUrl]);
   const getParticipantNames = (team) => {
     if (!Array.isArray(team?.members) || team.members.length === 0) return 'No participants added';
     return team.members.map((member) => member?.name || 'Unnamed').join(', ');
@@ -109,7 +235,7 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
 
       <div className="teams-scoring-container">
         <div className="teams-scoring">
-          <h2>Team Score (Round {currentRound})</h2>
+          <h2>Team Evaluation (Round {currentRound})</h2>
           <div className="scoring-table-container">
             <table className="scoring-table">
               <thead>
@@ -117,7 +243,12 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
                   <th>Team Name</th>
                   <th>Participants</th>
                   <th>Product</th>
-                  <th>Team Score (0-10)</th>
+                  {SCORE_CRITERIA.map((criteria) => (
+                    <th key={criteria.key} className="criteria-col">
+                      {criteria.label} (0-10)
+                    </th>
+                  ))}
+                  <th>Total (0-50)</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -125,27 +256,36 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
                 {teamsToDisplay.map((team) => (
                   <tr
                     key={team.id}
-                    className={`team-row ${selectedTeamId === team.id ? 'selected' : ''} ${team.poster ? 'has-poster' : ''}`}
-                    onClick={() => setSelectedTeamId(team.id)}
+                    className={`team-row ${selectedTeamId === team.id ? 'selected' : ''} ${resolveTeamPosterUrl(team) ? 'has-poster' : ''}`}
+                    onClick={() => {
+                      setSelectedTeamId(team.id);
+                      setPosterPreviewFailed(false);
+                    }}
                   >
                     <td className="team-name">{team.teamName}</td>
                     <td className="participant-names">{getParticipantNames(team)}</td>
                     <td className="product-name">{team.productName}</td>
-                    <td className="score-cell">
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.5"
-                        value={getTeamScore(team) === '-' ? '' : getTeamScore(team)}
-                        onChange={(e) => handleScoreChange(team.id, parseFloat(e.target.value) || 0)}
-                        className="score-input"
-                        placeholder="Score"
-                      />
-                      <span className="score-max">/10</span>
+                    {SCORE_CRITERIA.map((criteria) => (
+                      <td key={`${team.id}-${criteria.key}`} className="score-cell">
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          step="0.5"
+                          value={getTeamCriteriaScore(team, criteria.key)}
+                          onChange={(e) => handleScoreChange(team.id, criteria.key, e.target.value)}
+                          className="score-input"
+                          placeholder="0"
+                        />
+                      </td>
+                    ))}
+                    <td className="total-cell">
+                      {getTeamTotalScore(team) === '-' ? '-' : (
+                        <span className="total-badge">{Number(getTeamTotalScore(team)).toFixed(1)}/50</span>
+                      )}
                     </td>
                     <td className="status">
-                      {getTeamScore(team) !== '-' ? (
+                      {getTeamTotalScore(team) !== '-' ? (
                         <span className="status-badge done">Scored</span>
                       ) : (
                         <span className="status-badge pending">Pending</span>
@@ -157,56 +297,78 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
             </table>
           </div>
         </div>
+      </div>
 
-        {selectedTeamId && (
-          <div className="poster-preview-panel">
-            <div className="poster-header">
-              <h3>{selectedTeam?.teamName} - Poster</h3>
-              <button className="close-btn" onClick={() => setSelectedTeamId(null)}>
-                X
-              </button>
-            </div>
-            {selectedTeam?.poster ? (
-              <div className="poster-container">
-                {selectedPosterType === 'image' && (
-                  <img src={selectedTeam.poster} alt="Team Poster" className="poster-image" />
-                )}
-                {selectedPosterType === 'pdf' && (
-                  <iframe src={selectedTeam.poster} title="Team Poster" className="poster-pdf" />
-                )}
-                {selectedPosterType === 'video' && (
-                  <video src={selectedTeam.poster} controls className="poster-video">
-                    Your browser does not support the video tag.
-                  </video>
-                )}
-                {selectedPosterType === 'unknown' && (
-                  <a href={selectedTeam.poster} target="_blank" rel="noreferrer" className="poster-open-link">
-                    Open Poster File
-                  </a>
-                )}
-              </div>
-            ) : (
-              <div className="no-poster">
-                <p>No poster uploaded yet</p>
-              </div>
-            )}
-            {selectedTeam?.video && (
-              <div className="poster-container" style={{ marginTop: '0.8rem' }}>
-                <video src={selectedTeam.video} controls className="poster-video">
+      {selectedTeamId && (
+        <div className="poster-preview-panel">
+          <div className="poster-header">
+            <h3>{selectedTeam?.teamName} - Poster & Details</h3>
+            <button className="close-btn" onClick={() => setSelectedTeamId(null)}>
+              X
+            </button>
+          </div>
+          <div className="team-details-grid">
+            <div><strong>Team:</strong> {selectedTeam?.teamName || '-'}</div>
+            <div><strong>Product:</strong> {selectedTeam?.productName || '-'}</div>
+            <div className="team-details-full"><strong>Participants:</strong> {getParticipantNames(selectedTeam)}</div>
+          </div>
+          {selectedPosterUrl ? (
+            <div className="poster-container">
+              {!posterPreviewFailed && selectedPosterType === 'image' && (
+                <img
+                  src={selectedPosterUrl}
+                  alt="Team Poster"
+                  className="poster-image"
+                  onError={() => setPosterPreviewFailed(true)}
+                />
+              )}
+              {!posterPreviewFailed && selectedPosterType === 'pdf' && (
+                <iframe
+                  src={selectedPosterUrl}
+                  title="Team Poster"
+                  className="poster-pdf"
+                  onError={() => setPosterPreviewFailed(true)}
+                />
+              )}
+              {!posterPreviewFailed && selectedPosterType === 'video' && (
+                <video src={selectedPosterUrl} controls className="poster-video" onError={() => setPosterPreviewFailed(true)}>
                   Your browser does not support the video tag.
                 </video>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+              )}
+              {(selectedPosterType === 'unknown' || posterPreviewFailed) && (
+                <a href={selectedPosterUrl} target="_blank" rel="noreferrer" className="poster-open-link">
+                  Open Poster File
+                </a>
+              )}
+              {selectedPosterType !== 'unknown' && (
+                <div style={{ marginTop: '0.7rem' }}>
+                  <a href={selectedPosterUrl} target="_blank" rel="noreferrer" className="poster-open-link">
+                    Open Poster in New Tab
+                  </a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="no-poster">
+              <p>No poster uploaded yet</p>
+            </div>
+          )}
+          {selectedVideoUrl && (
+            <div className="poster-container" style={{ marginTop: '0.8rem' }}>
+              <video src={selectedVideoUrl} controls className="poster-video">
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="judge-info">
         <p>
           <strong>Current Judge:</strong> {currentJudge}
         </p>
         <p>
-          Scored: {teamsToDisplay.filter((t) => getTeamScore(t) !== '-').length} / {teamsToDisplay.length} teams
+          Scored: {teamsToDisplay.filter((t) => getTeamTotalScore(t) !== '-').length} / {teamsToDisplay.length} teams
         </p>
       </div>
 
@@ -217,7 +379,7 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
             Clear All Round Scores
           </button>
           <button onClick={deleteSelectedTeamScore} className="danger-btn delete-btn">
-            Delete Selected Team Score
+            Delete Selected Team Evaluation
           </button>
         </div>
       </div>
@@ -274,7 +436,7 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
           border-color: transparent;
         }
         .round-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .teams-scoring-container { display: grid; grid-template-columns: 1fr 300px; gap: 2rem; margin-bottom: 2rem; align-items: start; }
+        .teams-scoring-container { margin-bottom: 1.2rem; }
         .teams-scoring {
           background: linear-gradient(135deg, rgba(10, 15, 35, 0.7) 0%, rgba(34, 211, 238, 0.05) 100%);
           border: 2px solid rgba(34, 211, 238, 0.2);
@@ -294,9 +456,11 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
         .team-name { color: #22d3ee; font-weight: 600; }
         .product-name { font-size: 0.9rem; color: #8a92a1; }
         .participant-names { font-size: 0.85rem; color: #cbd5e1; max-width: 280px; }
-        .score-cell { display: flex; align-items: center; gap: 0.5rem; }
+        .scoring-table-container { overflow-x: auto; }
+        .criteria-col { min-width: 130px; }
+        .score-cell { text-align: center; }
         .score-input {
-          width: 80px;
+          width: 70px;
           padding: 0.6rem;
           background: rgba(0, 0, 0, 0.4);
           border: 2px solid rgba(34, 211, 238, 0.2);
@@ -304,7 +468,17 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
           border-radius: 6px;
           text-align: center;
         }
-        .score-max { color: #8a92a1; font-weight: 600; }
+        .total-cell { text-align: center; }
+        .total-badge {
+          display: inline-block;
+          padding: 0.35rem 0.7rem;
+          border-radius: 999px;
+          background: rgba(34, 211, 238, 0.15);
+          border: 1px solid rgba(34, 211, 238, 0.35);
+          color: #67e8f9;
+          font-weight: 700;
+          font-size: 0.82rem;
+        }
         .status-badge { display: inline-block; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
         .status-badge.done { background: rgba(34, 197, 94, 0.2); color: #86efac; }
         .status-badge.pending { background: rgba(239, 193, 53, 0.2); color: #fcd34d; }
@@ -315,20 +489,26 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
           background: linear-gradient(135deg, rgba(10, 15, 35, 0.9) 0%, rgba(34, 211, 238, 0.1) 100%);
           border: 2px solid rgba(34, 211, 238, 0.3);
           border-radius: 12px;
-          padding: 1.5rem;
-          position: sticky;
-          top: 100px;
-          max-height: 600px;
-          display: flex;
-          flex-direction: column;
+          padding: 1rem;
+          max-width: 640px;
+          margin: 0 auto 2rem auto;
         }
         .poster-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
         .poster-header h3 { color: #22d3ee; margin: 0; font-size: 1rem; }
+        .team-details-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.6rem 1.2rem;
+          color: #cbd5e1;
+          margin-bottom: 0.9rem;
+          font-size: 0.92rem;
+        }
+        .team-details-full { grid-column: 1 / -1; }
         .close-btn { background: transparent; border: none; color: #22d3ee; font-size: 1.2rem; cursor: pointer; }
-        .poster-container { flex: 1; overflow-y: auto; border-radius: 8px; background: rgba(0, 0, 0, 0.3); padding: 1rem; }
-        .poster-image { width: 100%; height: auto; border-radius: 6px; }
+        .poster-container { border-radius: 8px; background: rgba(0, 0, 0, 0.3); padding: 0.8rem; max-width: 560px; }
+        .poster-image { width: 100%; max-width: 520px; max-height: 420px; object-fit: contain; height: auto; border-radius: 6px; }
         .poster-pdf,
-        .poster-video { width: 100%; min-height: 200px; border: none; border-radius: 6px; background: rgba(0, 0, 0, 0.6); }
+        .poster-video { width: 100%; max-width: 520px; height: 320px; border: none; border-radius: 6px; background: rgba(0, 0, 0, 0.6); }
         .poster-open-link {
           display: inline-block;
           padding: 0.7rem 0.9rem;
@@ -376,8 +556,7 @@ export default function JudgeDashboard({ user, teams, onUpdateScores, onClearSco
           .judge-controls { flex-direction: column; gap: 1rem; }
           .control-group { flex-direction: column; width: 100%; }
           .judge-identity { width: 100%; }
-          .teams-scoring-container { grid-template-columns: 1fr; }
-          .poster-preview-panel { max-height: 400px; position: static; }
+          .team-details-grid { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>

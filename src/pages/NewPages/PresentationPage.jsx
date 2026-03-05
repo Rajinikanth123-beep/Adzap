@@ -4,10 +4,11 @@ export default function PresentationPage({ teams, onNavigate }) {
   const [selectedRound, setSelectedRound] = useState(1);
   const [selectedTeamId, setSelectedTeamId] = useState(null);
   const [isPosterPageOpen, setIsPosterPageOpen] = useState(false);
+  const round1QualifiedTeams = teams.filter((t) => t.round1?.selected);
 
   const teamsForRound = selectedRound === 1
     ? teams
-    : teams.filter((t) => t.round1?.selected);
+    : round1QualifiedTeams;
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const getMediaType = (url) => {
@@ -162,11 +163,14 @@ export default function PresentationPage({ teams, onNavigate }) {
             setSelectedTeamId(null);
             setIsPosterPageOpen(false);
           }}
-          disabled={teams.length === 0}
+          disabled={round1QualifiedTeams.length === 0}
         >
           Round 2: Qualified Teams
         </button>
       </div>
+      {selectedRound === 2 && round1QualifiedTeams.length === 0 && (
+        <p className="round-info">No teams selected from Round 1 yet.</p>
+      )}
 
       <div className="presentation-container">
         <div className="teams-list-section">
@@ -185,7 +189,6 @@ export default function PresentationPage({ teams, onNavigate }) {
                   <h3>{team.teamName}</h3>
                   <div className="badge-wrap">
                     {team.poster && <span className="poster-badge">Poster</span>}
-                    {team.video && <span className="poster-badge">Video</span>}
                   </div>
                 </div>
 
@@ -258,17 +261,6 @@ export default function PresentationPage({ teams, onNavigate }) {
                   <span className="value">{selectedTeam.members?.length || 0} members</span>
                 </div>
               </div>
-
-              <div className="team-details-box">
-                <h3>Demo Video</h3>
-                {selectedTeam.video ? (
-                  <video src={selectedTeam.video} controls className="team-video" />
-                ) : (
-                  <div className="no-poster">
-                    <p>No demo video uploaded</p>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         )}
@@ -300,6 +292,12 @@ export default function PresentationPage({ teams, onNavigate }) {
           margin-bottom: 2rem;
           justify-content: center;
           flex-wrap: wrap;
+        }
+        .round-info {
+          text-align: center;
+          color: #fcd34d;
+          margin: -1rem 0 1.5rem;
+          font-weight: 600;
         }
 
         .round-btn {

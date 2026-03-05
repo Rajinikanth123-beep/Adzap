@@ -104,7 +104,7 @@ export default function HomePage({ onNavigate }) {
           <div className="card">
             <div className="feature-icon">⚖️ Judges</div>
             <h3>Multi-Judge System</h3>
-            <p>Multiple judges scoring with automatic average calculation</p>
+            <p>Multiple judges scoring with criteria-based total calculation</p>
           </div>
           <div className="card">
             <div className="feature-icon">🏆 Rankings</div>

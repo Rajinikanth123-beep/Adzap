@@ -1,26 +1,57 @@
 import React from 'react';
 
 export default function FinalPage({ teams, onNavigate }) {
-  const getAverageScore = (team, round) => {
-    const scores = team.scores || {};
-    const judgeScores = [];
-
-    for (let i = 1; i <= 2; i++) {
-      const value = scores[`judge${i}`]?.[`round${round}`];
-      if (value !== undefined && value !== null) {
-        judgeScores.push(Number(value));
-      }
+  const getRoundEntry = (team, judgeId, round) => {
+    const judgeData = team?.scores?.[judgeId];
+    if (!judgeData) return null;
+    const roundKey = `round${round}`;
+    const roundValue = judgeData?.[roundKey];
+    if (roundValue !== undefined && roundValue !== null) return roundValue;
+    if (judgeData.round === round && judgeData.score !== undefined && judgeData.score !== null) {
+      return judgeData.score;
     }
+    return null;
+  };
 
-    if (judgeScores.length === 0) return null;
-    return judgeScores.reduce((a, b) => a + b, 0) / judgeScores.length;
+  const getJudgeTotal = (team, judgeId, round) => {
+    const entry = getRoundEntry(team, judgeId, round);
+    if (entry === null || entry === undefined) return null;
+    if (typeof entry === 'number') return Number.isFinite(entry) ? entry : null;
+    if (typeof entry === 'object') {
+      if (entry.total !== undefined && entry.total !== null) {
+        const total = Number(entry.total);
+        if (Number.isFinite(total)) return total;
+      }
+      const criteria = entry.criteriaScores && typeof entry.criteriaScores === 'object'
+        ? entry.criteriaScores
+        : entry;
+      const keys = [
+        'creativityAndDesign',
+        'technicalKnowledge',
+        'clarityOfConcept',
+        'visualPresentation',
+        'explanationAndInteraction',
+      ];
+      return keys.reduce((sum, key) => {
+        const value = Number(criteria?.[key]);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+    }
+    return null;
+  };
+
+  const getRoundTotalScore = (team, round) => {
+    const judge1 = getJudgeTotal(team, 'judge1', round);
+    const judge2 = getJudgeTotal(team, 'judge2', round);
+    if (judge1 === null && judge2 === null) return null;
+    return Number(judge1 || 0) + Number(judge2 || 0);
   };
 
   const finalists = teams.filter(team => team.round1?.selected);
   const ranking = finalists
-    .map(team => ({ ...team, average: getAverageScore(team, 2) }))
-    .filter(team => team.average !== null)
-    .sort((a, b) => b.average - a.average);
+    .map(team => ({ ...team, total: getRoundTotalScore(team, 2) }))
+    .filter(team => team.total !== null)
+    .sort((a, b) => b.total - a.total);
 
   const winnerList = teams.filter(team => team.round2?.selected);
 
@@ -57,9 +88,9 @@ export default function FinalPage({ teams, onNavigate }) {
       </section>
 
       <section className="final-card">
-        <h2>Final Ranking (By Round 2 Average)</h2>
+        <h2>Final Ranking</h2>
         {ranking.length === 0 ? (
-          <p className="empty-text">No final scores available yet.</p>
+          <p className="empty-text">No final ranking available yet.</p>
         ) : (
           <table className="final-table">
             <thead>
@@ -67,7 +98,6 @@ export default function FinalPage({ teams, onNavigate }) {
                 <th>Position</th>
                 <th>Team</th>
                 <th>Product</th>
-                <th>Average</th>
               </tr>
             </thead>
             <tbody>
@@ -76,7 +106,6 @@ export default function FinalPage({ teams, onNavigate }) {
                   <td>#{index + 1}</td>
                   <td>{team.teamName}</td>
                   <td>{team.productName}</td>
-                  <td>{team.average.toFixed(2)}/10</td>
                 </tr>
               ))}
             </tbody>

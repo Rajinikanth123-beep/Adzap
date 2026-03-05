@@ -54,6 +54,7 @@ export default function NewApp() {
   const MAX_PARTICIPANT_REGISTRATIONS = 600;
   const MAX_ADMIN_ACCOUNTS = 6;
   const MAX_JUDGE_ACCOUNTS = 2;
+  const PARTICIPANT_CREDENTIALS_KEY = 'adzap_participant_credentials';
   const [currentPage, setCurrentPage] = useState(getInitialPage);
   const [user, setUser] = useState(null);
   const [teams, setTeams] = useState([]);
@@ -78,6 +79,46 @@ export default function NewApp() {
     }
     return Array.from(byEmailOrId.values());
   }, []);
+
+  const readStoredJson = (key, fallback = null) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      return JSON.parse(raw);
+    } catch (_error) {
+      return fallback;
+    }
+  };
+
+  const upsertParticipantCredential = (email, password) => {
+    const emailKey = String(email || '').trim().toLowerCase();
+    const passwordKey = String(password || '').trim();
+    if (!emailKey || !passwordKey) return;
+    const existing = readStoredJson(PARTICIPANT_CREDENTIALS_KEY, {});
+    const next = {
+      ...(existing && typeof existing === 'object' ? existing : {}),
+      [emailKey]: passwordKey,
+    };
+    safeSetItem(PARTICIPANT_CREDENTIALS_KEY, next);
+  };
+
+  const resolveJudgeId = useCallback(
+    (emailInput) => {
+      const email = String(emailInput || '').trim().toLowerCase();
+      if (!email) return 'judge1';
+      if (email.includes('judge1')) return 'judge1';
+      if (email.includes('judge2')) return 'judge2';
+
+      const index = judgeAccounts.findIndex(
+        (account) => String(account?.email || '').trim().toLowerCase() === email
+      );
+      if (index === 0) return 'judge1';
+      if (index === 1) return 'judge2';
+
+      return 'judge1';
+    },
+    [judgeAccounts]
+  );
 
   const safeSetItem = (key, value, options = {}) => {
     const { fallbackValue } = options;
@@ -153,10 +194,26 @@ export default function NewApp() {
         const data = await callApi('get', '/api/bootstrap');
         if (!mounted) return;
 
-        setTeams(dedupeTeams(Array.isArray(data?.teams) ? data.teams : []));
-        setContactMessages(Array.isArray(data?.contactMessages) ? data.contactMessages : []);
-        setAdminAccounts(Array.isArray(data?.adminAccounts) ? data.adminAccounts : []);
-        setJudgeAccounts(Array.isArray(data?.judgeAccounts) ? data.judgeAccounts : []);
+        const serverTeams = dedupeTeams(Array.isArray(data?.teams) ? data.teams : []);
+        const serverMessages = Array.isArray(data?.contactMessages) ? data.contactMessages : [];
+        const serverAdmins = Array.isArray(data?.adminAccounts) ? data.adminAccounts : [];
+        const serverJudges = Array.isArray(data?.judgeAccounts) ? data.judgeAccounts : [];
+
+        const localTeamsRaw = readStoredJson('adzap_teams', []);
+        const localMessagesRaw = readStoredJson('adzap_contact_messages', []);
+        const localAdminsRaw = readStoredJson('adzap_admins', []);
+        const localJudgesRaw = readStoredJson('adzap_judges', []);
+
+        const localTeams = dedupeTeams(Array.isArray(localTeamsRaw) ? localTeamsRaw : []);
+        const localMessages = Array.isArray(localMessagesRaw) ? localMessagesRaw : [];
+        const localAdmins = Array.isArray(localAdminsRaw) ? localAdminsRaw : [];
+        const localJudges = Array.isArray(localJudgesRaw) ? localJudgesRaw : [];
+
+        // If backend returns empty data but browser has cached records, keep local data to prevent accidental wipe on refresh.
+        setTeams(serverTeams.length > 0 ? serverTeams : localTeams);
+        setContactMessages(serverMessages.length > 0 ? serverMessages : localMessages);
+        setAdminAccounts(serverAdmins.length > 0 ? serverAdmins : localAdmins);
+        setJudgeAccounts(serverJudges.length > 0 ? serverJudges : localJudges);
         setBackendAvailable(true);
         setBackendRequiredError('');
 
@@ -352,6 +409,7 @@ export default function NewApp() {
       try {
         const data = await callApi('post', '/api/teams/register', teamData);
         setTeams(prev => dedupeTeams([...prev, data.team]));
+        upsertParticipantCredential(teamData.email, teamData.password);
         setCurrentPage('participant-login');
         return { success: true };
       } catch (error) {
@@ -398,11 +456,36 @@ export default function NewApp() {
       round2: { avgScore: 0, selected: false },
     };
     setTeams([...teams, newTeam]);
+    upsertParticipantCredential(teamData.email, teamData.password);
     setCurrentPage('participant-login');
     return { success: true };
   };
 
   const handleParticipantLogin = async (email, password) => {
+    const tryLocalParticipantLogin = () => {
+      if (!LOCAL_FALLBACK_ENABLED) {
+        return false;
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const trimmedPassword = password.trim();
+      const savedCredentials = readStoredJson(PARTICIPANT_CREDENTIALS_KEY, {});
+      const savedPassword =
+        savedCredentials && typeof savedCredentials === 'object'
+          ? savedCredentials[normalizedEmail]
+          : null;
+
+      const team = teams.find((t) => t.email?.trim().toLowerCase() === normalizedEmail);
+      const passwordMatches = team?.password === trimmedPassword || savedPassword === trimmedPassword;
+      if (team && passwordMatches) {
+        upsertParticipantCredential(email, password);
+        setUser({ ...team, teamId: team.id, role: 'participant' });
+        setCurrentPage('participant-dashboard');
+        return true;
+      }
+      return false;
+    };
+
     if (backendAvailable) {
       try {
         const data = await callApi('post', '/api/auth/participant/login', { email, password });
@@ -416,11 +499,13 @@ export default function NewApp() {
           });
         }
         const team = teamFromServer || teams.find(t => t.id === data?.user?.teamId);
+        upsertParticipantCredential(email, password);
         setUser(team ? { ...team, role: 'participant', teamId: team.id } : data.user);
         setCurrentPage('participant-dashboard');
         return true;
       } catch (_error) {
-        return false;
+        // If backend login fails, fall back to local auth to avoid blocking active participants.
+        return tryLocalParticipantLogin();
       }
     }
 
@@ -429,17 +514,7 @@ export default function NewApp() {
       return false;
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const trimmedPassword = password.trim();
-    const team = teams.find(
-      t => t.email?.trim().toLowerCase() === normalizedEmail && t.password === trimmedPassword
-    );
-    if (team) {
-      setUser({ ...team, teamId: team.id, role: 'participant' });
-      setCurrentPage('participant-dashboard');
-      return true;
-    }
-    return false;
+    return tryLocalParticipantLogin();
   };
 
   const handleAdminRegister = async (adminData) => {
@@ -577,7 +652,10 @@ export default function NewApp() {
     if (backendAvailable) {
       try {
         const data = await callApi('post', '/api/auth/judge/login', { email, password });
-        setUser(data.user);
+        setUser({
+          ...data.user,
+          judgeId: resolveJudgeId(data?.user?.email || email),
+        });
         setCurrentPage('judge-dashboard');
         return true;
       } catch (_error) {
@@ -597,7 +675,12 @@ export default function NewApp() {
     );
 
     if (savedJudge) {
-      setUser({ name: savedJudge.name, email: savedJudge.email, role: 'judge' });
+      setUser({
+        name: savedJudge.name,
+        email: savedJudge.email,
+        role: 'judge',
+        judgeId: resolveJudgeId(savedJudge.email),
+      });
       setCurrentPage('judge-dashboard');
       return true;
     }
@@ -606,7 +689,7 @@ export default function NewApp() {
     if (judgeAccounts.length < MAX_JUDGE_ACCOUNTS) {
       const defaultJudgeEmails = ['judge1@adzap.com', 'judge2@adzap.com'];
       if (defaultJudgeEmails.includes(email.toLowerCase()) && password === 'judge123') {
-        setUser({ name: email, email, role: 'judge' });
+        setUser({ name: email, email, role: 'judge', judgeId: resolveJudgeId(email) });
         setCurrentPage('judge-dashboard');
         return true;
       }
@@ -669,13 +752,19 @@ export default function NewApp() {
       if (team.id === teamId) {
         const existingJudgeScores = team.scores?.[judgeId] || {};
         const roundKey = `round${score.round}`;
+        const roundPayload = score.criteriaScores
+          ? {
+              criteriaScores: score.criteriaScores,
+              total: Number(score.total) || 0,
+            }
+          : score.score;
         return {
           ...team,
           scores: {
             ...team.scores,
             [judgeId]: {
               ...existingJudgeScores,
-              [roundKey]: score.score,
+              [roundKey]: roundPayload,
             },
           },
         };
@@ -952,6 +1041,7 @@ export default function NewApp() {
         return user?.role === 'admin' ? (
           <AdminDashboard
             teams={teams}
+            judgeAccounts={judgeAccounts}
             contactMessages={contactMessages}
             onDeleteContactMessage={deleteContactMessage}
             onSelectRound1={selectRound1}
@@ -1008,17 +1098,7 @@ export default function NewApp() {
 
   return (
     <div className="adzap-container">
-      {isBootstrapping ? (
-        <main className="adzap-main" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
-          <div className="card" style={{ maxWidth: 560, width: '100%', textAlign: 'center' }}>
-            <h2 style={{ marginBottom: '0.7rem', color: '#22d3ee' }}>Server waking up, please wait...</h2>
-            <p style={{ color: '#a0aab9', lineHeight: 1.6 }}>
-              Initial connection can take a few seconds on first load.
-            </p>
-          </div>
-        </main>
-      ) : (
-        <>
+      <>
       {/* Header */}
       <header className="adzap-header">
         <div className="header-content">
@@ -1067,6 +1147,11 @@ export default function NewApp() {
 
       {/* Main Content */}
       <main className="adzap-main">
+        {isBootstrapping && (
+          <div className="alert" style={{ marginBottom: '1rem' }}>
+            Syncing latest data...
+          </div>
+        )}
         {backendRequiredError && (
           <div className="alert alert-error" style={{ marginBottom: '1rem' }}>
             {backendRequiredError}
@@ -1079,8 +1164,7 @@ export default function NewApp() {
       <footer className="adzap-footer">
         <p>&copy; 2026 ADZAP-DefendX Event Management System. All rights reserved.</p>
       </footer>
-        </>
-      )}
+      </>
     </div>
   );
 }

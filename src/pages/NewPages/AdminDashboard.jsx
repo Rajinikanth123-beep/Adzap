@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 
-export default function AdminDashboard({ teams, contactMessages = [], onDeleteContactMessage, onSelectRound1, onSelectRound2, onDeleteTeams, onClearRoundSelections, onUpdateProductName, onUpdateScores, onDownloadReport, onNavigate }) {
+const SCORE_CRITERIA = [
+  { key: 'creativityAndDesign', label: 'Creativity & Design' },
+  { key: 'technicalKnowledge', label: 'Technical Knowledge' },
+  { key: 'clarityOfConcept', label: 'Clarity of Concept' },
+  { key: 'visualPresentation', label: 'Visual Presentation' },
+  { key: 'explanationAndInteraction', label: 'Explanation & Interaction' },
+];
+
+export default function AdminDashboard({ teams, judgeAccounts = [], contactMessages = [], onDeleteContactMessage, onSelectRound1, onSelectRound2, onDeleteTeams, onClearRoundSelections, onUpdateProductName, onUpdateScores, onDownloadReport, onNavigate }) {
   const [selectedTeams, setSelectedTeams] = useState([]);
   const [currentRound, setCurrentRound] = useState(1);
 
@@ -37,36 +45,44 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
   };
 
   const teamsToDisplay = getTeamsForRound();
+  const adminTableColumnCount = 12;
 
-  const getAverageScore = (team, round) => {
-    const scores = team.scores || {};
-    const judgeScores = [];
+  const resolveJudgeKeyMap = (team) => {
+    const scoresMap = team?.scores || {};
+    const keys = Object.keys(scoresMap).filter((key) => key && scoresMap[key] !== undefined && scoresMap[key] !== null);
+    const picked = new Set();
+    const judge1Email = String(judgeAccounts?.[0]?.email || '').trim().toLowerCase();
+    const judge2Email = String(judgeAccounts?.[1]?.email || '').trim().toLowerCase();
+    const findAndPick = (predicate) => {
+      const found = keys.find((key) => !picked.has(key) && predicate(key));
+      if (found) picked.add(found);
+      return found || null;
+    };
 
-    for (let i = 1; i <= 2; i++) {
-      const judgeData = scores[`judge${i}`];
-      if (!judgeData) continue;
+    const judge1Key =
+      findAndPick((key) => key === 'judge1') ||
+      findAndPick((key) => String(key).toLowerCase().includes('judge1')) ||
+      (judge1Email ? findAndPick((key) => String(key).trim().toLowerCase() === judge1Email) : null) ||
+      findAndPick(() => true);
 
-      const roundKey = `round${round}`;
-      if (judgeData[roundKey] !== undefined && judgeData[roundKey] !== null) {
-        judgeScores.push(Number(judgeData[roundKey]));
-        continue;
-      }
+    const judge2Key =
+      findAndPick((key) => key === 'judge2') ||
+      findAndPick((key) => String(key).toLowerCase().includes('judge2')) ||
+      (judge2Email ? findAndPick((key) => String(key).trim().toLowerCase() === judge2Email) : null) ||
+      findAndPick(() => true);
 
-      // Backward compatibility with older format: { round: N, score: X }
-      if (judgeData.round === round && judgeData.score !== undefined && judgeData.score !== null) {
-        judgeScores.push(Number(judgeData.score));
-      }
-    }
-
-    if (judgeScores.length === 0) return null;
-    return judgeScores.reduce((a, b) => a + b, 0) / judgeScores.length;
+    return { judge1: judge1Key, judge2: judge2Key };
   };
 
-  const getScoreValue = (team, judgeId, round) => {
-    const judgeData = team?.scores?.[judgeId];
-    if (!judgeData) return '';
+  const getJudgeRoundEntry = (team, judgeId, round) => {
+    const scoresMap = team?.scores || {};
+    const keyMap = resolveJudgeKeyMap(team);
+    const resolvedJudgeKey = keyMap[judgeId] || null;
 
+    const judgeData = resolvedJudgeKey ? scoresMap[resolvedJudgeKey] : null;
+    if (!judgeData) return null;
     const roundKey = `round${round}`;
+
     if (judgeData[roundKey] !== undefined && judgeData[roundKey] !== null) {
       return judgeData[roundKey];
     }
@@ -75,19 +91,69 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
       return judgeData.score;
     }
 
-    return '';
+    return null;
   };
 
-  const handleAdminScoreChange = (teamId, judgeId, rawScore) => {
+  const toCriteriaScores = (entry) => {
+    const base = SCORE_CRITERIA.reduce((acc, item) => ({ ...acc, [item.key]: 0 }), {});
+    if (!entry || typeof entry !== 'object') return base;
+    const source = entry.criteriaScores && typeof entry.criteriaScores === 'object' ? entry.criteriaScores : entry;
+    return SCORE_CRITERIA.reduce((acc, item) => {
+      const raw = Number(source[item.key]);
+      const safe = Number.isFinite(raw) ? Math.min(10, Math.max(0, raw)) : 0;
+      acc[item.key] = safe;
+      return acc;
+    }, { ...base });
+  };
+
+  const getJudgeCriteriaValue = (team, judgeId, round, criterionKey) => {
+    const entry = getJudgeRoundEntry(team, judgeId, round);
+    if (!entry || typeof entry !== 'object') return '';
+    const criteria = toCriteriaScores(entry);
+    return criteria[criterionKey] ?? '';
+  };
+
+  const getJudgeTotal = (team, judgeId, round) => {
+    const entry = getJudgeRoundEntry(team, judgeId, round);
+    if (entry === null || entry === undefined) return null;
+    if (typeof entry === 'number') return Number.isFinite(entry) ? entry : null;
+    if (typeof entry === 'object') {
+      if (entry.total !== undefined && entry.total !== null) {
+        const total = Number(entry.total);
+        if (Number.isFinite(total)) return total;
+      }
+      const criteria = toCriteriaScores(entry);
+      return SCORE_CRITERIA.reduce((sum, item) => sum + Number(criteria[item.key] || 0), 0);
+    }
+    return null;
+  };
+
+  const getTeamTotal = (team, round) => {
+    const judge1Total = getJudgeTotal(team, 'judge1', round);
+    const judge2Total = getJudgeTotal(team, 'judge2', round);
+    if (judge1Total === null && judge2Total === null) return null;
+    return Number(judge1Total || 0) + Number(judge2Total || 0);
+  };
+
+  const handleAdminScoreChange = (teamId, judgeId, criterionKey, rawScore) => {
     if (typeof onUpdateScores !== 'function') return;
     if (rawScore === '') return;
 
     const parsedScore = Number(rawScore);
     if (!Number.isFinite(parsedScore)) return;
+    const safeScore = Math.min(10, Math.max(0, parsedScore));
+    const team = teams.find((item) => item.id === teamId);
+    const current = toCriteriaScores(getJudgeRoundEntry(team, judgeId, currentRound));
+    const criteriaScores = {
+      ...current,
+      [criterionKey]: safeScore,
+    };
+    const total = SCORE_CRITERIA.reduce((sum, item) => sum + Number(criteriaScores[item.key] || 0), 0);
 
     onUpdateScores(teamId, judgeId, {
       round: currentRound,
-      score: Math.min(10, Math.max(0, parsedScore)),
+      criteriaScores,
+      total,
     });
   };
 
@@ -166,6 +232,7 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
       <div className="admin-content">
         <div className="teams-selection">
           <h2>Select Top Teams for Round {currentRound}</h2>
+          <p className="table-scroll-note">Each team is shown in two rows: Judge 1 (top) and Judge 2 (bottom).</p>
           {currentRound === 2 && teamsToDisplay.length === 0 && (
             <p className="no-qualified-msg">
               No Round 1 qualified teams found. Finalize Round 1 with selected teams first.
@@ -178,72 +245,95 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
                   <th>Select</th>
                   <th>Team Name</th>
                   <th>{currentRound === 2 ? 'Product Name (Admin)' : 'Product'}</th>
-                  <th>Judge 1</th>
-                  <th>Judge 2</th>
-                  <th>Average (Round {currentRound})</th>
+                  <th>Judge</th>
+                  {SCORE_CRITERIA.map((criteria) => (
+                    <th key={`criteria-${criteria.key}`}>{criteria.label}</th>
+                  ))}
+                  <th>Judge Total</th>
+                  <th>Team Total (Round {currentRound})</th>
                   <th>Delete</th>
                 </tr>
               </thead>
               <tbody>
-                {teamsToDisplay.map(team => (
-                  <tr key={team.id} className={selectedTeams.includes(team.id) ? 'selected' : ''}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={selectedTeams.includes(team.id)}
-                        onChange={() => toggleTeamSelection(team.id)}
-                      />
-                    </td>
-                    <td>{team.teamName}</td>
-                    <td>
-                      {currentRound === 2 ? (
-                        <input
-                          type="text"
-                          value={team.productName || ''}
-                          onChange={(e) => onUpdateProductName(team.id, e.target.value)}
-                          className="product-input"
-                          placeholder="Enter product name"
-                        />
-                      ) : (
-                        team.productName
-                      )}
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.5"
-                        value={getScoreValue(team, 'judge1', currentRound)}
-                        onChange={(e) => handleAdminScoreChange(team.id, 'judge1', e.target.value)}
-                        className="score-input"
-                        placeholder="-"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.5"
-                        value={getScoreValue(team, 'judge2', currentRound)}
-                        onChange={(e) => handleAdminScoreChange(team.id, 'judge2', e.target.value)}
-                        className="score-input"
-                        placeholder="-"
-                      />
-                    </td>
-                    <td>{getAverageScore(team, currentRound)?.toFixed(2) ?? '-'}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className="row-delete-btn"
-                        onClick={() => deleteSingleTeam(team.id, team.teamName)}
-                      >
-                        Delete
-                      </button>
+                {teamsToDisplay.length === 0 ? (
+                  <tr>
+                    <td colSpan={adminTableColumnCount} className="empty-row">
+                      No teams found for Round {currentRound}.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  teamsToDisplay.map(team => (
+                    <React.Fragment key={team.id}>
+                      <tr className={selectedTeams.includes(team.id) ? 'selected' : ''}>
+                        <td rowSpan={2}>
+                          <input
+                            type="checkbox"
+                            checked={selectedTeams.includes(team.id)}
+                            onChange={() => toggleTeamSelection(team.id)}
+                          />
+                        </td>
+                        <td rowSpan={2}>{team.teamName}</td>
+                        <td rowSpan={2}>
+                          {currentRound === 2 ? (
+                            <input
+                              type="text"
+                              value={team.productName || ''}
+                              onChange={(e) => onUpdateProductName(team.id, e.target.value)}
+                              className="product-input"
+                              placeholder="Enter product name"
+                            />
+                          ) : (
+                            team.productName
+                          )}
+                        </td>
+                        <td className="judge-label judge1">Judge 1</td>
+                        {SCORE_CRITERIA.map((criteria) => (
+                          <td key={`${team.id}-j1-${criteria.key}`}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.5"
+                              value={getJudgeCriteriaValue(team, 'judge1', currentRound, criteria.key)}
+                              onChange={(e) => handleAdminScoreChange(team.id, 'judge1', criteria.key, e.target.value)}
+                              className="score-input"
+                              placeholder="0"
+                            />
+                          </td>
+                        ))}
+                        <td>{getJudgeTotal(team, 'judge1', currentRound)?.toFixed(1) ?? '-'}{getJudgeTotal(team, 'judge1', currentRound) !== null ? '/50' : ''}</td>
+                        <td rowSpan={2}>{getTeamTotal(team, currentRound)?.toFixed(1) ?? '-'}{getTeamTotal(team, currentRound) !== null ? '/100' : ''}</td>
+                        <td rowSpan={2}>
+                          <button
+                            type="button"
+                            className="row-delete-btn"
+                            onClick={() => deleteSingleTeam(team.id, team.teamName)}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                      <tr className={`${selectedTeams.includes(team.id) ? 'selected' : ''}`}>
+                        <td className="judge-label judge2">Judge 2</td>
+                        {SCORE_CRITERIA.map((criteria) => (
+                          <td key={`${team.id}-j2-${criteria.key}`}>
+                            <input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.5"
+                              value={getJudgeCriteriaValue(team, 'judge2', currentRound, criteria.key)}
+                              onChange={(e) => handleAdminScoreChange(team.id, 'judge2', criteria.key, e.target.value)}
+                              className="score-input"
+                              placeholder="0"
+                            />
+                          </td>
+                        ))}
+                        <td>{getJudgeTotal(team, 'judge2', currentRound)?.toFixed(1) ?? '-'}{getJudgeTotal(team, 'judge2', currentRound) !== null ? '/50' : ''}</td>
+                      </tr>
+                    </React.Fragment>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -396,7 +486,13 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
 
         .teams-selection h2 {
           color: #22d3ee;
-          margin-bottom: 1.5rem;
+          margin-bottom: 0.45rem;
+        }
+
+        .table-scroll-note {
+          margin: 0 0 1rem 0;
+          color: #94a3b8;
+          font-size: 0.84rem;
         }
 
         .no-qualified-msg {
@@ -413,31 +509,65 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
         .teams-table {
           overflow-x: auto;
           margin-bottom: 1.5rem;
+          border: 1px solid rgba(34, 211, 238, 0.2);
+          border-radius: 8px;
+        }
+
+        .teams-table::-webkit-scrollbar {
+          height: 10px;
+        }
+
+        .teams-table::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.7);
+          border-radius: 999px;
+        }
+
+        .teams-table::-webkit-scrollbar-thumb {
+          background: rgba(34, 211, 238, 0.5);
+          border-radius: 999px;
         }
 
         table {
           width: 100%;
+          min-width: 1250px;
           border-collapse: collapse;
         }
 
         th {
           background: rgba(34, 211, 238, 0.1);
           color: #22d3ee;
-          padding: 1rem;
+          padding: 0.75rem;
           text-align: left;
           font-weight: 600;
+          font-size: 0.85rem;
           border-bottom: 2px solid rgba(34, 211, 238, 0.2);
         }
 
         td {
-          padding: 1rem;
+          padding: 0.75rem;
           border-bottom: 1px solid rgba(34, 211, 238, 0.1);
           color: #a0aab9;
+          font-size: 0.88rem;
+        }
+
+        .empty-row {
+          text-align: center;
+          color: #94a3b8;
+          font-weight: 600;
+          padding: 1.1rem;
         }
 
         tr.selected {
           background: rgba(34, 211, 238, 0.1);
         }
+
+        .judge-label {
+          font-weight: 700;
+          white-space: nowrap;
+        }
+
+        .judge1 { color: #22d3ee; }
+        .judge2 { color: #67e8f9; }
 
         input[type="checkbox"] {
           width: 20px;
@@ -464,8 +594,8 @@ export default function AdminDashboard({ teams, contactMessages = [], onDeleteCo
         }
 
         .score-input {
-          width: 78px;
-          padding: 0.45rem 0.55rem;
+          width: 62px;
+          padding: 0.4rem 0.45rem;
           background: rgba(0, 0, 0, 0.4);
           border: 1px solid rgba(34, 211, 238, 0.35);
           color: #e2e8f0;
